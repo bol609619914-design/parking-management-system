@@ -33,19 +33,19 @@ A role-based parking management platform built with Vue 3 and Express for parkin
 
 ## Project Structure
 
-```
+```text
 parking-management-system/
-?? src/
-?  ?? App.vue
-?  ?? api.js
-?  ?? assets/
-?? server/
-?  ?? data/db.json
-?  ?? lib/
-?  ?? index.js
-?? docs/images/
-?? package.json
-?? README.md
+|- src/
+|  |- App.vue
+|  |- api.js
+|  - assets/
+|- server/
+|  |- data/db.json
+|  |- lib/
+|  - index.js
+|- docs/images/
+|- package.json
+- README.md
 ```
 
 ## Getting Started
