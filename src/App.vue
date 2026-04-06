@@ -7,6 +7,7 @@ const authScreen = ref("login");
 const activeMenu = ref("overview");
 const registrationStep = ref(0);
 const loading = ref(false);
+const resetLoading = ref(false);
 const notificationsOpen = ref(false);
 const toast = reactive({ visible: false, title: "", message: "" });
 const auth = reactive({ token: "", user: null });
@@ -35,6 +36,13 @@ const loginForm = reactive({
   otp: "",
   remember: true,
   sliderVerified: false,
+});
+
+const resetForm = reactive({
+  phone: "",
+  otp: "",
+  newPassword: "",
+  confirmPassword: "",
 });
 
 const registration = reactive({
@@ -97,6 +105,7 @@ const roleMap = {
 
 const roleLabel = computed(() => roleMap[auth.user?.role] || "未登录");
 const isUserPortal = computed(() => auth.user?.role === "user" || dashboard.viewType === "user");
+const canEditPricing = computed(() => auth.user?.role === "admin");
 const userSummaryCards = computed(() => dashboard.userPortal?.summary || []);
 const canCheckout = computed(() => {
   const status = dashboard.userPortal?.activeParking?.billingStatus;
@@ -173,9 +182,27 @@ function selectUserMenu(menuKey) {
 }
 
 async function handleSendOtp() {
+  if (!loginForm.phone) {
+    notify("请输入手机号", "发送验证码前需要先填写手机号。");
+    return;
+  }
   try {
     const result = await api.sendOtp(loginForm.phone);
     loginForm.otp = result.code;
+    notify("验证码已发送", `测试环境验证码：${result.code}`);
+  } catch (error) {
+    notify("发送失败", error.message);
+  }
+}
+
+async function handleSendResetOtp() {
+  if (!resetForm.phone) {
+    notify("请输入手机号", "发送验证码前需要先填写需要找回的手机号。");
+    return;
+  }
+  try {
+    const result = await api.sendOtp(resetForm.phone);
+    resetForm.otp = result.code;
     notify("验证码已发送", `测试环境验证码：${result.code}`);
   } catch (error) {
     notify("发送失败", error.message);
@@ -288,6 +315,10 @@ async function handleExit() {
 }
 
 async function handleSavePricing() {
+  if (!canEditPricing.value) {
+    notify("无权修改", "商户端目前只能查看计费配置，修改请使用管理端账号。");
+    return;
+  }
   try {
     await api.updatePricing(auth.token, pricingForm);
     notify("计费规则已更新", "新的免费时长与封顶金额已生效。");
@@ -368,10 +399,42 @@ function openNotice(notice) {
 }
 
 function openMembership() {
+  if (!dashboard.userPortal?.membership) return;
   setUserDetail("月租服务", dashboard.userPortal.membership.plan, [
     { label: "到期日期", value: dashboard.userPortal.membership.expiresAt },
     { label: "绑定车位", value: dashboard.userPortal.membership.spaceCode },
   ]);
+}
+
+async function handleResetPassword() {
+  if (!resetForm.phone || !resetForm.otp || !resetForm.newPassword || !resetForm.confirmPassword) {
+    notify("请补全信息", "手机号、验证码和新密码都需要填写。");
+    return;
+  }
+
+  if (resetForm.newPassword !== resetForm.confirmPassword) {
+    notify("两次密码不一致", "请重新确认新密码。");
+    return;
+  }
+
+  resetLoading.value = true;
+  try {
+    await api.resetPassword({
+      phone: resetForm.phone,
+      otp: resetForm.otp,
+      newPassword: resetForm.newPassword,
+    });
+    notify("密码已重置", "请返回登录页使用新密码重新登录。");
+    resetForm.otp = "";
+    resetForm.newPassword = "";
+    resetForm.confirmPassword = "";
+    authScreen.value = "login";
+    loginMode.value = "password";
+  } catch (error) {
+    notify("重置失败", error.message);
+  } finally {
+    resetLoading.value = false;
+  }
 }
 
 async function handleCreateReservation() {
@@ -416,7 +479,9 @@ async function handleUserCheckout() {
 function logout() {
   auth.token = "";
   auth.user = null;
+  notificationsOpen.value = false;
   loginForm.sliderVerified = false;
+  loginMode.value = "password";
   authScreen.value = "login";
 }
 </script>
@@ -428,86 +493,86 @@ function logout() {
 
       <template v-if="authScreen === 'login'">
         <div class="card-tabs compact">
-          <button class="card-tab" :class="{ 'is-active': loginMode === 'password' }" @click="loginMode = 'password'">&#36134;&#21495;&#30331;&#24405;</button>
-          <button class="card-tab" :class="{ 'is-active': loginMode === 'otp' }" @click="loginMode = 'otp'">&#25163;&#26426;&#24555;&#25463;&#30331;&#24405;</button>
+          <button class="card-tab" :class="{ 'is-active': loginMode === 'password' }" @click="loginMode = 'password'">账号登录</button>
+          <button class="card-tab" :class="{ 'is-active': loginMode === 'otp' }" @click="loginMode = 'otp'">手机快捷登录</button>
         </div>
 
         <div class="login-form auth-form-block">
           <label class="field">
             <span class="field-icon">@</span>
-            <input v-if="loginMode === 'password'" v-model="loginForm.identifier" type="text" placeholder="&#37038;&#31665; / &#29992;&#25143;&#21517;" />
-            <input v-else v-model="loginForm.phone" type="tel" placeholder="&#25163;&#26426;&#21495;" />
+            <input v-if="loginMode === 'password'" v-model="loginForm.identifier" type="text" placeholder="邮箱 / 用户名" />
+            <input v-else v-model="loginForm.phone" type="tel" placeholder="手机号" />
           </label>
 
           <label class="field" v-if="loginMode === 'password'">
             <span class="field-icon">*</span>
-            <input v-model="loginForm.password" type="password" placeholder="&#30331;&#24405;&#23494;&#30721;" />
+            <input v-model="loginForm.password" type="password" placeholder="登录密码" />
           </label>
 
           <div class="otp-row" v-else>
             <label class="field">
               <span class="field-icon">#</span>
-              <input v-model="loginForm.otp" type="text" placeholder="&#30701;&#20449;&#39564;&#35777;&#30721;" />
+              <input v-model="loginForm.otp" type="text" placeholder="短信验证码" />
             </label>
-            <button class="ghost-button" @click="handleSendOtp">&#21457;&#36865;&#39564;&#35777;&#30721;</button>
+            <button class="ghost-button" type="button" @click="handleSendOtp">发送验证码</button>
           </div>
 
           <div class="slider-verify" :class="{ verified: loginForm.sliderVerified }" @click="loginForm.sliderVerified = !loginForm.sliderVerified">
             <div class="slider-track">
               <div class="slider-fill"></div>
               <div class="slider-thumb"></div>
-              <span>{{ loginForm.sliderVerified ? "&#24050;&#36890;&#36807;&#23433;&#20840;&#39564;&#35777;" : "&#28857;&#20987;&#27169;&#25311;&#28369;&#22359;&#39564;&#35777;" }}</span>
+              <span>{{ loginForm.sliderVerified ? "已通过安全验证" : "点击模拟滑块验证" }}</span>
             </div>
           </div>
 
           <div class="form-row">
             <label class="checkbox">
               <input v-model="loginForm.remember" type="checkbox" />
-              <span>&#35760;&#20303;&#25105;</span>
+              <span>记住我</span>
             </label>
             <div class="auth-links">
-              <a href="#" class="link-text">&#24536;&#35760;&#23494;&#30721;&#65311;</a>
-              <button type="button" class="link-button" @click="authScreen = 'register'">&#27880;&#20876;</button>
+              <button type="button" class="link-button" @click="authScreen = 'reset'">忘记密码？</button>
+              <button type="button" class="link-button" @click="authScreen = 'register'">注册</button>
             </div>
           </div>
 
-          <button class="primary-button wide" :disabled="loading" @click="handleLogin">{{ loading ? "&#30331;&#24405;&#20013;..." : "&#36827;&#20837;&#25511;&#21046;&#21488;" }}</button>
+          <button class="primary-button wide" :disabled="loading" @click="handleLogin">{{ loading ? "登录中..." : "进入控制台" }}</button>
         </div>
       </template>
 
-      <template v-else>
+      <template v-else-if="authScreen === 'register'">
         <div class="auth-links auth-links-top">
-          <button type="button" class="link-button" @click="authScreen = 'login'">&#36820;&#22238;&#30331;&#24405;</button>
+          <button type="button" class="link-button" @click="authScreen = 'login'">返回登录</button>
         </div>
 
         <div class="step-progress auth-form-block">
           <div class="step-line"><span class="step-fill" :style="{ width: `${(registrationStep + 1) * 33.33}%` }"></span></div>
           <div class="step-labels">
-            <button class="step-label" :class="{ 'is-current': registrationStep === 0 }" @click="registrationStep = 0">&#22522;&#26412;&#20449;&#24687;</button>
-            <button class="step-label" :class="{ 'is-current': registrationStep === 1 }" @click="registrationStep = 1">&#22330;&#25152;&#32465;&#23450;</button>
-            <button class="step-label" :class="{ 'is-current': registrationStep === 2 }" @click="registrationStep = 2">&#25552;&#20132;&#23457;&#26680;</button>
+            <button class="step-label" :class="{ 'is-current': registrationStep === 0 }" @click="registrationStep = 0">基本信息</button>
+            <button class="step-label" :class="{ 'is-current': registrationStep === 1 }" @click="registrationStep = 1">场所绑定</button>
+            <button class="step-label" :class="{ 'is-current': registrationStep === 2 }" @click="registrationStep = 2">提交审核</button>
           </div>
         </div>
 
         <section v-if="registrationStep === 0" class="step-panel is-active auth-form-block">
           <div class="split-grid stacked">
-            <label class="field"><span class="field-icon">U</span><input v-model="registration.applicant" type="text" placeholder="&#30003;&#35831;&#20154;&#22995;&#21517;" /></label>
-            <label class="field"><span class="field-icon">@</span><input v-model="registration.email" type="email" placeholder="&#32852;&#31995;&#37038;&#31665;" /></label>
+            <label class="field"><span class="field-icon">U</span><input v-model="registration.applicant" type="text" placeholder="申请人姓名" /></label>
+            <label class="field"><span class="field-icon">@</span><input v-model="registration.email" type="email" placeholder="联系邮箱" /></label>
           </div>
           <div class="role-switch stacked">
-            <button class="role-card" :class="{ 'is-selected': registration.role === 'merchant' }" @click="registration.role = 'merchant'">&#21830;&#25143;&#31471;</button>
-            <button class="role-card" :class="{ 'is-selected': registration.role === 'admin' }" @click="registration.role = 'admin'">&#31649;&#29702;&#31471;&#65288;&#38656;&#21518;&#21488;&#23457;&#25209;&#65289;</button>
+            <button class="role-card" :class="{ 'is-selected': registration.role === 'merchant' }" @click="registration.role = 'merchant'">商户端</button>
+            <button class="role-card" :class="{ 'is-selected': registration.role === 'admin' }" @click="registration.role = 'admin'">管理端（需后台审批）</button>
           </div>
         </section>
 
         <section v-if="registrationStep === 1" class="step-panel is-active auth-form-block">
           <div class="split-grid stacked">
-            <label class="field"><span class="field-icon">P</span><input v-model="registration.siteName" type="text" placeholder="&#20572;&#36710;&#22330;&#21517;&#31216;" /></label>
-            <label class="field"><span class="field-icon">#</span><input v-model="registration.siteCode" type="text" placeholder="&#22330;&#25152;&#32534;&#30721; / &#32465;&#23450;&#32534;&#21495;" /></label>
+            <label class="field"><span class="field-icon">P</span><input v-model="registration.siteName" type="text" placeholder="停车场名称" /></label>
+            <label class="field"><span class="field-icon">#</span><input v-model="registration.siteCode" type="text" placeholder="场所编码 / 绑定编号" /></label>
           </div>
           <div class="upload-box">
-            <strong>&#22330;&#25152;&#32465;&#23450;</strong>
-            <p>&#21518;&#31471;&#20250;&#25226;&#27880;&#20876;&#20449;&#24687;&#20889;&#20837;&#23457;&#26680;&#27744;&#65292;&#21518;&#32493;&#21487;&#25193;&#23637;&#38468;&#20214;&#19978;&#20256;&#19982;&#23457;&#25209;&#27969;&#12290;</p>
+            <strong>场所绑定</strong>
+            <p>后台会将注册信息写入审核池，后续可继续扩展附件上传与审批流。</p>
           </div>
         </section>
 
@@ -515,19 +580,52 @@ function logout() {
           <div class="review-card">
             <div class="review-icon"><span></span></div>
             <div>
-              <h3>&#36164;&#26009;&#24050;&#23601;&#32490;</h3>
-              <p>&#25552;&#20132;&#21518;&#33258;&#21160;&#36827;&#20837;&#23457;&#25209;&#27969;&#31243;&#65292;&#23457;&#26680;&#32467;&#26524;&#20250;&#36890;&#36807;&#31995;&#32479;&#36890;&#30693;&#36820;&#22238;&#12290;</p>
+              <h3>资料已就绪</h3>
+              <p>提交后会自动进入审批流程，审核结果将通过系统通知返回。</p>
             </div>
           </div>
           <label class="checkbox agreement">
             <input v-model="registration.agreement" type="checkbox" />
-            <span>&#25105;&#24050;&#38405;&#35835;&#24182;&#21516;&#24847; <a href="#" class="link-text">&#12298;&#20572;&#36710;&#22330;&#31649;&#29702;&#31995;&#32479;&#26381;&#21153;&#21327;&#35758;&#12299;</a></span>
+            <span>我已阅读并同意 <a href="#" class="link-text">《停车场管理系统服务协议》</a></span>
           </label>
           <div class="step-actions">
-            <button class="secondary-button" :disabled="registrationStep === 0" @click="registrationStep -= 1">&#19978;&#19968;&#27493;</button>
-            <button class="primary-button" @click="registrationStep < 2 ? (registrationStep += 1) : handleRegister()">{{ registrationStep < 2 ? "&#19979;&#19968;&#27493;" : "&#25552;&#20132;&#23457;&#26680;" }}</button>
+            <button class="secondary-button" :disabled="registrationStep === 0" @click="registrationStep -= 1">上一步</button>
+            <button class="primary-button" @click="registrationStep < 2 ? (registrationStep += 1) : handleRegister()">{{ registrationStep < 2 ? "下一步" : "提交审核" }}</button>
           </div>
         </section>
+      </template>
+
+      <template v-else>
+        <div class="auth-links auth-links-top">
+          <button type="button" class="link-button" @click="authScreen = 'login'">返回登录</button>
+        </div>
+
+        <div class="login-form auth-form-block">
+          <label class="field">
+            <span class="field-icon">@</span>
+            <input v-model="resetForm.phone" type="tel" placeholder="找回账号绑定手机号" />
+          </label>
+
+          <div class="otp-row">
+            <label class="field">
+              <span class="field-icon">#</span>
+              <input v-model="resetForm.otp" type="text" placeholder="短信验证码" />
+            </label>
+            <button class="ghost-button" type="button" @click="handleSendResetOtp">发送验证码</button>
+          </div>
+
+          <label class="field">
+            <span class="field-icon">*</span>
+            <input v-model="resetForm.newPassword" type="password" placeholder="设置新密码" />
+          </label>
+
+          <label class="field">
+            <span class="field-icon">*</span>
+            <input v-model="resetForm.confirmPassword" type="password" placeholder="再次确认新密码" />
+          </label>
+
+          <button class="primary-button wide" :disabled="resetLoading" @click="handleResetPassword">{{ resetLoading ? "提交中..." : "重置密码" }}</button>
+        </div>
       </template>
     </section>
   </div>
@@ -913,12 +1011,16 @@ function logout() {
         <section class="module-card narrow-card">
           <div class="module-header"><div><p class="eyebrow">Billing Engine</p><h3>多策略计费配置</h3></div></div>
           <div class="billing-steps">
-            <label class="billing-step is-active"><span>01</span><div><strong>免费时长</strong><input v-model.number="pricingForm.freeMinutes" type="number" min="0" /></div></label>
-            <label class="billing-step is-active"><span>02</span><div><strong>封顶金额</strong><input v-model.number="pricingForm.capAmount" type="number" min="0" /></div></label>
-            <label class="billing-step"><span>03</span><div><strong>分段 / 阶梯</strong><div class="inline-fields"><input v-model.number="pricingForm.hourlyRate" type="number" min="0" /><input v-model.number="pricingForm.stepRate" type="number" min="0" /></div></div></label>
+            <label class="billing-step is-active"><span>01</span><div><strong>免费时长</strong><input v-model.number="pricingForm.freeMinutes" :disabled="!canEditPricing" type="number" min="0" /></div></label>
+            <label class="billing-step is-active"><span>02</span><div><strong>封顶金额</strong><input v-model.number="pricingForm.capAmount" :disabled="!canEditPricing" type="number" min="0" /></div></label>
+            <label class="billing-step"><span>03</span><div><strong>分段 / 阶梯</strong><div class="inline-fields"><input v-model.number="pricingForm.hourlyRate" :disabled="!canEditPricing" type="number" min="0" /><input v-model.number="pricingForm.stepRate" :disabled="!canEditPricing" type="number" min="0" /></div></div></label>
           </div>
           <div class="qr-card"><div><p>扫码 / 无感支付</p><strong>{{ currentReport?.latestOrder || '订单待生成' }}</strong></div><div class="qr-code"></div></div>
-          <button class="primary-button wide" @click="handleSavePricing">保存计费规则</button>
+          <div v-if="!canEditPricing" class="upload-box">
+            <strong>当前为只读模式</strong>
+            <p>商户端可以查看计费规则和支付方式，修改请使用管理端账号登录。</p>
+          </div>
+          <button v-if="canEditPricing" class="primary-button wide" @click="handleSavePricing">保存计费规则</button>
         </section>
       </template>
 

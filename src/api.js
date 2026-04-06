@@ -38,6 +38,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  resetPassword(payload) {
+    return request("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   getDashboard(token) {
     return request("/dashboard", {
       headers: { Authorization: `Bearer ${token}` },

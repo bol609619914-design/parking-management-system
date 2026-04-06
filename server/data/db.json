@@ -202,18 +202,18 @@
       "id": "entry-live-1",
       "plateNumber": "粤A A839Q",
       "plateType": "fixed",
-      "entryTime": "2026-04-06T09:12:00.000Z",
+      "entryTime": "2026-04-06T18:12:00.000Z",
       "gateIn": "gate-east-in",
       "spaceCode": "B-03",
       "status": "closed",
-      "exitTime": "2026-04-06T14:39:31.475Z",
+      "exitTime": "2026-04-06T23:49:40.456Z",
       "gateOut": "gate-east-out",
       "billing": {
-        "durationMinutes": 328,
-        "rawAmount": 40,
+        "durationMinutes": 338,
+        "rawAmount": 44,
         "discountAmount": 20,
-        "finalAmount": 20,
-        "exitTime": "2026-04-06T14:39:31.475Z"
+        "finalAmount": 24,
+        "exitTime": "2026-04-06T23:49:40.456Z"
       }
     },
     {
@@ -264,13 +264,13 @@
       "createdAt": "2026-04-06T11:27:44.922Z"
     },
     {
-      "id": "pay-1775486371475-6185fi",
+      "id": "pay-1775519380456-qjb3r3",
       "entryId": "entry-live-1",
       "plateNumber": "粤A A839Q",
-      "amount": 20,
+      "amount": 24,
       "discountAmount": 20,
       "channel": "扫码支付",
-      "createdAt": "2026-04-06T14:39:31.475Z"
+      "createdAt": "2026-04-06T23:49:40.456Z"
     }
   ],
   "otp": {
@@ -280,8 +280,8 @@
   },
   "lastOcr": {
     "gateId": "gate-east-in",
-    "plateNumber": "粤A 66666",
-    "normalizedPlate": "粤A66666",
+    "plateNumber": "粤Z 99001",
+    "normalizedPlate": "粤Z99001",
     "confidence": 98,
     "provider": "Local OCR Adapter",
     "listType": "unknown",
@@ -312,7 +312,7 @@
         "lotName": "星港商业中心停车场",
         "spaceCode": "B-03",
         "entryLabel": "本次停车已完成结算",
-        "durationLabel": "5 小时 28 分",
+        "durationLabel": "5 小时 38 分",
         "currentAmount": 0,
         "billingStatus": "已完成支付，可离场"
       },
@@ -366,11 +366,11 @@
       ],
       "orders": [
         {
-          "id": "pay-1775486371475-6185fi",
+          "id": "pay-1775519380456-qjb3r3",
           "plateNumber": "粤A A839Q",
           "site": "星港商业中心停车场",
-          "duration": "5 小时 28 分",
-          "amount": 20,
+          "duration": "5 小时 38 分",
+          "amount": 24,
           "channel": "扫码支付"
         },
         {
@@ -413,21 +413,21 @@
       },
       "notices": [
         {
-          "id": "notice-1775486371475-eox8yj",
+          "id": "notice-1775519380456-0vxw2h",
           "title": "离场缴费完成",
           "message": "粤A A839Q 已完成支付，可直接离场。",
-          "time": "刚刚"
-        },
-        {
-          "id": "notice-1775486365219-cbpctx",
-          "title": "预约成功",
-          "message": "星港商业中心 B1 层 08 号位 已为你锁定，请在预约时段内到场。",
           "time": "刚刚"
         },
         {
           "id": "notice-demo-1",
           "title": "待离场缴费",
           "message": "你的车辆当前停放在 B-03，请完成缴费后离场。",
+          "time": "刚刚"
+        },
+        {
+          "id": "notice-1775486365219-cbpctx",
+          "title": "预约成功",
+          "message": "星港商业中心 B1 层 08 号位 已为你锁定，请在预约时段内到场。",
           "time": "刚刚"
         },
         {

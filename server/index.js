@@ -61,6 +61,22 @@ function requireUserRole(req, res) {
   return true;
 }
 
+function requireConsoleRole(req, res) {
+  if (!["admin", "merchant"].includes(req.user?.role)) {
+    res.status(403).json({ message: "当前账号无权访问后台操作" });
+    return false;
+  }
+  return true;
+}
+
+function requireAdminRole(req, res) {
+  if (req.user?.role !== "admin") {
+    res.status(403).json({ message: "仅管理端可修改计费规则" });
+    return false;
+  }
+  return true;
+}
+
 function formatDurationLabel(durationMinutes) {
   const hours = Math.floor(durationMinutes / 60);
   const minutes = durationMinutes % 60;
@@ -141,14 +157,43 @@ app.get("/api/health", (_req, res) => {
 
 app.post("/api/auth/send-otp", (req, res) => {
   const db = readDb();
-  const phone = req.body.phone;
+  const phone = req.body?.phone;
+  if (!phone) {
+    return res.status(400).json({ message: "请输入手机号" });
+  }
   const code = db.otp[phone] || "246810";
   res.json({ phone, code, expiresIn: 300 });
 });
 
+app.post("/api/auth/reset-password", (req, res) => {
+  const db = readDb();
+  const { phone, otp, newPassword } = req.body || {};
+  const user = db.users.find((item) => item.phone === phone);
+
+  if (!phone || !otp || !newPassword) {
+    return res.status(400).json({ message: "请完整填写手机号、验证码和新密码" });
+  }
+
+  if (!user) {
+    return res.status(404).json({ message: "未找到对应账号" });
+  }
+
+  if (db.otp[phone] !== otp) {
+    return res.status(401).json({ message: "短信验证码错误" });
+  }
+
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ message: "新密码至少需要 6 位" });
+  }
+
+  user.passwordHash = bcrypt.hashSync(newPassword, 10);
+  writeDb(db);
+  res.json({ ok: true, message: "密码已重置，请使用新密码登录" });
+});
+
 app.post("/api/auth/login", (req, res) => {
   const db = readDb();
-  const { mode, identifier, password, phone, otp } = req.body;
+  const { mode, identifier, password, phone, otp } = req.body || {};
 
   let user = null;
   if (mode === "password") {
@@ -179,7 +224,7 @@ app.post("/api/auth/login", (req, res) => {
 
 app.post("/api/auth/register", (req, res) => {
   const db = readDb();
-  const { applicant, email, role, siteName, siteCode, agreement } = req.body;
+  const { applicant, email, role, siteName, siteCode, agreement } = req.body || {};
   if (!agreement) {
     return res.status(400).json({ message: "请先勾选服务协议" });
   }
@@ -205,14 +250,18 @@ app.get("/api/dashboard", authMiddleware, (req, res) => {
 });
 
 app.post("/api/ocr/recognize", authMiddleware, (req, res) => {
+  if (!requireConsoleRole(req, res)) return;
+
   const db = readDb();
-  const result = recognizeVehicle(req.body, db.vehicleProfiles);
+  const result = recognizeVehicle(req.body || {}, db.vehicleProfiles);
   db.lastOcr = result;
   writeDb(db);
   res.json(result);
 });
 
 app.put("/api/spaces/:code", authMiddleware, (req, res) => {
+  if (!requireConsoleRole(req, res)) return;
+
   const db = readDb();
   const space = db.spaces.find((item) => item.code === req.params.code);
   if (!space) {
@@ -220,7 +269,7 @@ app.put("/api/spaces/:code", authMiddleware, (req, res) => {
   }
 
   try {
-    updateSpaceState(space, req.body.action);
+    updateSpaceState(space, (req.body || {}).action);
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -337,8 +386,11 @@ app.post("/api/user/checkout", authMiddleware, (req, res) => {
 });
 
 app.post("/api/entries", authMiddleware, (req, res) => {
+  if (!requireConsoleRole(req, res)) return;
+
   const db = readDb();
-  const ocr = recognizeVehicle({ gateId: req.body.gateId, imageHint: req.body.plateNumber }, db.vehicleProfiles);
+  const body = req.body || {};
+  const ocr = recognizeVehicle({ gateId: body.gateId, imageHint: body.plateNumber }, db.vehicleProfiles);
   db.lastOcr = ocr;
 
   if (ocr.listType === "blacklist") {
@@ -352,7 +404,7 @@ app.post("/api/entries", authMiddleware, (req, res) => {
     return res.status(409).json({ message: "该车辆已在场内，无需重复入场" });
   }
 
-  const space = occupySpace(db, req.body.plateType || ocr.vehicleType);
+  const space = occupySpace(db, body.plateType || ocr.vehicleType);
   if (!space) {
     return res.status(400).json({ message: "当前停车场已无可用车位" });
   }
@@ -360,9 +412,9 @@ app.post("/api/entries", authMiddleware, (req, res) => {
   const entry = {
     id: nextId("entry"),
     plateNumber: ocr.plateNumber,
-    plateType: req.body.plateType || ocr.vehicleType,
+    plateType: body.plateType || ocr.vehicleType,
     entryTime: new Date().toISOString(),
-    gateIn: req.body.gateId,
+    gateIn: body.gateId,
     spaceCode: space.code,
     status: "active",
   };
@@ -373,13 +425,16 @@ app.post("/api/entries", authMiddleware, (req, res) => {
 });
 
 app.post("/api/exits", authMiddleware, (req, res) => {
+  if (!requireConsoleRole(req, res)) return;
+
   const db = readDb();
-  const entry = db.entries.find((item) => item.status === "active" && (item.id === req.body.entryId || item.plateNumber === req.body.plateNumber));
+  const body = req.body || {};
+  const entry = db.entries.find((item) => item.status === "active" && (item.id === body.entryId || item.plateNumber === body.plateNumber));
   if (!entry) {
     return res.status(404).json({ message: "未找到有效的在场车辆记录" });
   }
 
-  const coupon = findCoupon(db, req.body.couponCode);
+  const coupon = findCoupon(db, body.couponCode);
   const bill = calculateBill({ entry, pricing: db.pricing, coupon });
 
   entry.status = "closed";
@@ -394,7 +449,7 @@ app.post("/api/exits", authMiddleware, (req, res) => {
     plateNumber: entry.plateNumber,
     amount: bill.finalAmount,
     discountAmount: bill.discountAmount,
-    channel: req.body.paymentChannel || "扫码支付",
+    channel: body.paymentChannel || "扫码支付",
     createdAt: bill.exitTime,
   };
 
@@ -404,15 +459,18 @@ app.post("/api/exits", authMiddleware, (req, res) => {
 });
 
 app.put("/api/billing/config", authMiddleware, (req, res) => {
+  if (!requireAdminRole(req, res)) return;
+
   const db = readDb();
+  const body = req.body || {};
   db.pricing = {
     ...db.pricing,
-    freeMinutes: Number(req.body.freeMinutes),
-    hourlyRate: Number(req.body.hourlyRate),
-    stepMinutes: Number(req.body.stepMinutes || 30),
-    stepRate: Number(req.body.stepRate),
-    capAmount: Number(req.body.capAmount),
-    nightRate: Number(req.body.nightRate || db.pricing.nightRate),
+    freeMinutes: Number(body.freeMinutes),
+    hourlyRate: Number(body.hourlyRate),
+    stepMinutes: Number(body.stepMinutes || 30),
+    stepRate: Number(body.stepRate),
+    capAmount: Number(body.capAmount),
+    nightRate: Number(body.nightRate || db.pricing.nightRate),
   };
   writeDb(db);
   res.json(db.pricing);
