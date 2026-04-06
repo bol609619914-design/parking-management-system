@@ -1,0 +1,31 @@
+{
+  "name": "parking-manage-system",
+  "version": "1.0.0",
+  "description": "Role-based parking management system built with Vue 3 and Express",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "vite --configLoader native",
+    "dev:api": "node server/index.js",
+    "build": "vite build --configLoader native",
+    "preview": "vite preview --configLoader native",
+    "start": "node server/index.js"
+  },
+  "keywords": [
+    "parking",
+    "vue",
+    "dashboard",
+    "billing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.5",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "vite": "^8.0.4",
+    "vue": "^3.5.32"
+  }
+}

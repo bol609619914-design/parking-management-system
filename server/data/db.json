@@ -1,0 +1,369 @@
+{
+  "users": [
+    {
+      "id": "u-admin-1",
+      "name": "?????",
+      "role": "admin",
+      "email": "admin@parksphere.local",
+      "phone": "13800138000",
+      "passwordHash": "$2b$10$EC8gB.ngDMycKyeSJSQBV.hLyOU66PGAYN/VzIwUuCg8yWTBAZC4K"
+    },
+    {
+      "id": "u-merchant-1",
+      "name": "??????",
+      "role": "merchant",
+      "email": "merchant@parksphere.local",
+      "phone": "13900139000",
+      "passwordHash": "$2b$10$JHcD9xayXui/BnUcffjKYuYLsQf.U9xMbiX942PSPdgFAjIjAhMeC"
+    },
+    {
+      "id": "u-user-1",
+      "name": "???",
+      "role": "user",
+      "email": "user@parksphere.local",
+      "phone": "13700137000",
+      "passwordHash": "$2b$10$AQwAeqpyHFBTV4ekwyZqrO/mL7epuQKEdyqalbfyka1Jg4Z5IUXFG"
+    }
+  ],
+  "applications": [],
+  "pricing": {
+    "freeMinutes": 30,
+    "hourlyRate": 8,
+    "stepMinutes": 30,
+    "stepRate": 4,
+    "capAmount": 88,
+    "nightRate": 5
+  },
+  "gates": [
+    {
+      "id": "gate-east-in",
+      "name": "????",
+      "status": "OCR ??"
+    },
+    {
+      "id": "gate-east-out",
+      "name": "????",
+      "status": "????"
+    },
+    {
+      "id": "gate-b2-in",
+      "name": "B2 ??",
+      "status": "????"
+    }
+  ],
+  "alerts": [
+    {
+      "id": "a-1",
+      "title": "????",
+      "message": "?????? 3 ???????????????",
+      "level": "warning"
+    },
+    {
+      "id": "a-2",
+      "title": "????",
+      "message": "B2 ??????????????????",
+      "level": "critical"
+    },
+    {
+      "id": "a-3",
+      "title": "????",
+      "message": "?A A839Q ????? 27 ?????????",
+      "level": "info"
+    }
+  ],
+  "spaces": [
+    {
+      "code": "A-01",
+      "status": "available",
+      "type": "temporary"
+    },
+    {
+      "code": "A-02",
+      "status": "reserved",
+      "type": "vip"
+    },
+    {
+      "code": "A-03",
+      "status": "occupied",
+      "type": "temporary"
+    },
+    {
+      "code": "A-04",
+      "status": "reserved",
+      "type": "vip"
+    },
+    {
+      "code": "B-01",
+      "status": "occupied",
+      "type": "temporary"
+    },
+    {
+      "code": "B-02",
+      "status": "occupied",
+      "type": "temporary"
+    },
+    {
+      "code": "B-03",
+      "status": "monthly",
+      "type": "fixed"
+    },
+    {
+      "code": "B-04",
+      "status": "available",
+      "type": "temporary"
+    },
+    {
+      "code": "C-01",
+      "status": "monthly",
+      "type": "fixed"
+    },
+    {
+      "code": "C-02",
+      "status": "occupied",
+      "type": "temporary"
+    },
+    {
+      "code": "C-03",
+      "status": "available",
+      "type": "temporary"
+    },
+    {
+      "code": "C-04",
+      "status": "reserved",
+      "type": "vip"
+    }
+  ],
+  "vehicleProfiles": {
+    "?AA839Q": {
+      "listType": "whitelist",
+      "owner": "???",
+      "vehicleType": "fixed"
+    },
+    "?BF6688": {
+      "listType": "blacklist",
+      "owner": "????",
+      "vehicleType": "temporary",
+      "reason": "???????"
+    },
+    "?C9001V": {
+      "listType": "whitelist",
+      "owner": "VIP ??",
+      "vehicleType": "vip"
+    }
+  },
+  "coupons": [
+    {
+      "code": "MALL-20",
+      "type": "amount",
+      "value": 20,
+      "name": "?????"
+    },
+    {
+      "code": "FREE-2H",
+      "type": "minutes",
+      "value": 120,
+      "name": "??????"
+    }
+  ],
+  "entries": [
+    {
+      "id": "entry-seed-1",
+      "plateNumber": "?D12345",
+      "plateType": "temporary",
+      "entryTime": "2026-04-06T07:30:00.000Z",
+      "exitTime": "2026-04-06T09:05:00.000Z",
+      "gateIn": "gate-east-in",
+      "gateOut": "gate-east-out",
+      "spaceCode": "A-03",
+      "status": "closed",
+      "billing": {
+        "durationMinutes": 95,
+        "discountAmount": 0,
+        "finalAmount": 12
+      }
+    },
+    {
+      "id": "entry-live-1",
+      "plateNumber": "?A A839Q",
+      "plateType": "fixed",
+      "entryTime": "2026-04-05T01:00:00.000Z",
+      "gateIn": "gate-east-in",
+      "spaceCode": "B-03",
+      "status": "active"
+    },
+    {
+      "id": "entry-live-2",
+      "plateNumber": "?A 66666",
+      "plateType": "temporary",
+      "entryTime": "2026-04-06T11:27:44.887Z",
+      "gateIn": "gate-east-in",
+      "spaceCode": "A-01",
+      "status": "closed",
+      "exitTime": "2026-04-06T11:27:44.922Z",
+      "gateOut": "gate-east-out",
+      "billing": {
+        "durationMinutes": 1,
+        "rawAmount": 0,
+        "discountAmount": 20,
+        "finalAmount": 0,
+        "exitTime": "2026-04-06T11:27:44.922Z"
+      }
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay-seed-1",
+      "entryId": "entry-seed-1",
+      "plateNumber": "?D12345",
+      "amount": 12,
+      "discountAmount": 0,
+      "channel": "????",
+      "createdAt": "2026-04-06T09:05:00.000Z"
+    },
+    {
+      "id": "pay-seed-2",
+      "entryId": "entry-seed-2",
+      "plateNumber": "?C88888",
+      "amount": 36,
+      "discountAmount": 20,
+      "channel": "????",
+      "createdAt": "2026-04-06T11:45:00.000Z"
+    },
+    {
+      "id": "pay-seed-3",
+      "entryId": "entry-live-2",
+      "plateNumber": "?A 66666",
+      "amount": 0,
+      "discountAmount": 20,
+      "channel": "????",
+      "createdAt": "2026-04-06T11:27:44.922Z"
+    }
+  ],
+  "otp": {
+    "13800138000": "246810",
+    "13900139000": "135790",
+    "13700137000": "864209"
+  },
+  "lastOcr": {
+    "gateId": "gate-east-in",
+    "plateNumber": "?A 66666",
+    "normalizedPlate": "?A66666",
+    "confidence": 98,
+    "provider": "Local OCR Adapter",
+    "listType": "unknown",
+    "vehicleType": "temporary",
+    "gateActionMessage": "????????"
+  },
+  "userPortals": {
+    "u-user-1": {
+      "summary": [
+        {
+          "label": "?????",
+          "value": "4 ?",
+          "hint": "?????????????"
+        },
+        {
+          "label": "??????",
+          "value": "18 ?",
+          "hint": "????? 4 ?"
+        },
+        {
+          "label": "????",
+          "value": "2 ?",
+          "hint": "?????????"
+        }
+      ],
+      "activeParking": {
+        "plateNumber": "?A A839Q",
+        "lotName": "?????????",
+        "spaceCode": "B-03",
+        "entryLabel": "2026-04-06 09:12 ??",
+        "durationLabel": "3 ?? 18 ?",
+        "currentAmount": 18,
+        "billingStatus": "?????"
+      },
+      "reservations": [
+        {
+          "id": "reserve-1",
+          "site": "?????? B1 ? 06 ??",
+          "time": "?? 18:30 - 22:00",
+          "status": "???"
+        },
+        {
+          "id": "reserve-2",
+          "site": "????? VIP ? 02 ??",
+          "time": "2026-04-08 09:00 - 18:00",
+          "status": "???"
+        }
+      ],
+      "coupons": [
+        {
+          "code": "MALL-20",
+          "title": "????? 20 ?",
+          "validUntil": "???? 2026-04-30"
+        },
+        {
+          "code": "FREE-2H",
+          "title": "??????",
+          "validUntil": "???? 2026-05-12"
+        },
+        {
+          "code": "VIP-NIGHT",
+          "title": "???? 8 ?",
+          "validUntil": "???? 2026-04-20"
+        }
+      ],
+      "orders": [
+        {
+          "id": "order-1",
+          "plateNumber": "?A A839Q",
+          "site": "?????????",
+          "duration": "2 ?? 05 ?",
+          "amount": 12,
+          "channel": "????"
+        },
+        {
+          "id": "order-2",
+          "plateNumber": "?A A839Q",
+          "site": "????????",
+          "duration": "6 ?? 20 ?",
+          "amount": 36,
+          "channel": "????"
+        },
+        {
+          "id": "order-3",
+          "plateNumber": "?A A839Q",
+          "site": "???????",
+          "duration": "1 ?? 10 ?",
+          "amount": 0,
+          "channel": "?????"
+        }
+      ],
+      "membership": {
+        "plan": "?????",
+        "expiresAt": "2026-05-31",
+        "spaceCode": "B-03"
+      },
+      "notices": [
+        {
+          "id": "notice-1",
+          "title": "??????",
+          "message": "???????? 2026-05-31 ?????????????",
+          "time": "??"
+        },
+        {
+          "id": "notice-2",
+          "title": "????",
+          "message": "?? 18:30 ? B1 ??????????????",
+          "time": "10 ???"
+        },
+        {
+          "id": "notice-3",
+          "title": "???????",
+          "message": "?? 2 ????????????",
+          "time": "??"
+        }
+      ]
+    }
+  }
+}
