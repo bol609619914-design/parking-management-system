@@ -6,3 +6,7 @@ coverage
 
 server-out.log
 server-err.log
+backend-out.log
+backend-err.log
+frontend-out.log
+frontend-err.log

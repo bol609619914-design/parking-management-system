@@ -10,6 +10,7 @@ const loading = ref(false);
 const notificationsOpen = ref(false);
 const toast = reactive({ visible: false, title: "", message: "" });
 const auth = reactive({ token: "", user: null });
+const userDetail = reactive({ title: "", subtitle: "", items: [] });
 
 const menus = [
   { key: "overview", label: "指挥中心", hint: "实时概览" },
@@ -17,6 +18,14 @@ const menus = [
   { key: "billing", label: "计费引擎", hint: "计费规则" },
   { key: "spaces", label: "车位管理", hint: "地图与预约" },
   { key: "finance", label: "财务审计", hint: "流水与报表" },
+];
+
+const userMenus = [
+  { key: "overview", label: "服务概览", hint: "当前停车与提醒" },
+  { key: "reservations", label: "预约车位", hint: "预约与到场信息" },
+  { key: "coupons", label: "优惠券", hint: "权益与抵扣" },
+  { key: "orders", label: "停车订单", hint: "账单与发票" },
+  { key: "membership", label: "月租服务", hint: "套餐与续费" },
 ];
 
 const loginForm = reactive({
@@ -57,6 +66,16 @@ const gateForm = reactive({
   entryId: "",
 });
 
+const reservationForm = reactive({
+  site: "星港商业中心 B1 层 08 号位",
+  time: "今天 20:00 - 23:00",
+});
+
+const checkoutForm = reactive({
+  couponCode: "MALL-20",
+  paymentChannel: "扫码支付",
+});
+
 const pricingForm = reactive({
   freeMinutes: 30,
   capAmount: 88,
@@ -67,11 +86,26 @@ const pricingForm = reactive({
 });
 
 const selectedSpaceCode = ref("A-01");
+const activeUserMenu = ref("overview");
+const userActionLoading = reactive({ reservation: false, checkout: false });
 
-const roleLabel = computed(() => (auth.user?.role === "admin" ? "管理端" : "商户端"));
+const roleMap = {
+  admin: "管理端",
+  merchant: "商户端",
+  user: "用户端",
+};
+
+const roleLabel = computed(() => roleMap[auth.user?.role] || "未登录");
+const isUserPortal = computed(() => auth.user?.role === "user" || dashboard.viewType === "user");
+const userSummaryCards = computed(() => dashboard.userPortal?.summary || []);
+const canCheckout = computed(() => {
+  const status = dashboard.userPortal?.activeParking?.billingStatus;
+  return !!status && status !== "已完成支付，可离场" && status !== "当前无在场车辆";
+});
 const plateResult = computed(() => dashboard.ocr?.plateNumber || "等待识别");
 const currentReport = computed(() => dashboard.reports[0] || null);
 const currentMenu = computed(() => menus.find((item) => item.key === activeMenu.value));
+const currentUserMenu = computed(() => userMenus.find((item) => item.key === activeUserMenu.value));
 const selectedSpace = computed(() => dashboard.map.find((space) => space.code === selectedSpaceCode.value) || dashboard.map[0] || null);
 
 function notify(title, message) {
@@ -81,6 +115,61 @@ function notify(title, message) {
   window.setTimeout(() => {
     toast.visible = false;
   }, 3200);
+}
+
+function syncUserDetail(menuKey = activeUserMenu.value) {
+  const portal = dashboard.userPortal;
+  if (!portal) return;
+
+  if (menuKey === "overview") {
+    if (portal.activeParking) {
+      setUserDetail("当前停车", portal.activeParking.plateNumber, [
+        { label: "停车场", value: portal.activeParking.lotName },
+        { label: "车位", value: portal.activeParking.spaceCode },
+        { label: "入场时间", value: portal.activeParking.entryLabel },
+        { label: "停车时长", value: portal.activeParking.durationLabel },
+        { label: "待结算费用", value: `¥ ${portal.activeParking.currentAmount}` },
+        { label: "状态", value: portal.activeParking.billingStatus },
+      ]);
+    }
+    return;
+  }
+
+  if (menuKey === "reservations") {
+    if (portal.reservations?.length) {
+      openReservation(portal.reservations[0]);
+    } else {
+      setUserDetail("预约车位", "暂无预约记录", [{ label: "说明", value: "提交预约后会在这里展示到场信息。" }]);
+    }
+    return;
+  }
+
+  if (menuKey === "coupons") {
+    if (portal.coupons?.length) {
+      openCoupon(portal.coupons[0]);
+    } else {
+      setUserDetail("优惠券", "暂无可用券", [{ label: "说明", value: "商户发券和停车减免会自动同步到这里。" }]);
+    }
+    return;
+  }
+
+  if (menuKey === "orders") {
+    if (portal.orders?.length) {
+      openOrder(portal.orders[0]);
+    } else {
+      setUserDetail("停车订单", "暂无历史订单", [{ label: "说明", value: "完成停车缴费后会生成停车订单。" }]);
+    }
+    return;
+  }
+
+  if (menuKey === "membership") {
+    openMembership();
+  }
+}
+
+function selectUserMenu(menuKey) {
+  activeUserMenu.value = menuKey;
+  syncUserDetail(menuKey);
 }
 
 async function handleSendOtp() {
@@ -99,9 +188,10 @@ async function loadDashboard() {
   Object.assign(dashboard, result);
   if (result.pricing) Object.assign(pricingForm, result.pricing);
   if (result.ocr?.plateNumber) gateForm.plateNumber = result.ocr.plateNumber;
-  if (!selectedSpaceCode.value || !result.map.some((space) => space.code === selectedSpaceCode.value)) {
+  if (Array.isArray(result.map) && (!selectedSpaceCode.value || !result.map.some((space) => space.code === selectedSpaceCode.value))) {
     selectedSpaceCode.value = result.map[0]?.code || "";
   }
+  if (result.userPortal) syncUserDetail();
 }
 
 async function handleLogin() {
@@ -132,6 +222,7 @@ async function handleLogin() {
     auth.user = result.user;
     await loadDashboard();
     activeMenu.value = "overview";
+    activeUserMenu.value = "overview";
     notify("登录成功", `欢迎回来，${result.user.name}`);
   } catch (error) {
     notify("登录失败", error.message);
@@ -219,14 +310,107 @@ async function handleSpaceAction(action) {
     notify("车位操作失败", error.message);
   }
 }
-function handleUserAction(action) {
-  const messages = {
-    renew: "????????????",
-    reserve: "????????????",
-    invoice: "??????????",
-    support: "??????????",
-  };
-  notify("????", messages[action] || "??????");
+function openSupport() {
+  setUserDetail("客服支持", "ParkSphere 7 x 24 小时服务", [
+    { label: "服务热线", value: "400-880-9090" },
+    { label: "在线客服", value: "工作日 08:00 - 22:00" },
+    { label: "处理范围", value: "停车异常、缴费问题、月租续费、开票协助" },
+  ]);
+}
+
+function openInvoiceGuide() {
+  const latestOrder = dashboard.userPortal?.orders?.[0];
+  setUserDetail("电子发票", latestOrder?.plateNumber || "最近订单", [
+    { label: "开票对象", value: latestOrder?.site || "停车订单" },
+    { label: "最近金额", value: `¥ ${latestOrder?.amount ?? 0}` },
+    { label: "处理方式", value: "联系客服登记开票信息后发送至邮箱" },
+  ]);
+}
+
+function setUserDetail(title, subtitle, items) {
+  userDetail.title = title;
+  userDetail.subtitle = subtitle;
+  userDetail.items = items;
+}
+
+function openSummary(card) {
+  setUserDetail(card.label, card.value, [{ label: "说明", value: card.hint }]);
+}
+
+function openReservation(item) {
+  setUserDetail("预约车位详情", item.site, [
+    { label: "预约时段", value: item.time },
+    { label: "当前状态", value: item.status },
+  ]);
+}
+
+function openCoupon(coupon) {
+  setUserDetail("优惠券详情", coupon.title, [
+    { label: "券码", value: coupon.code },
+    { label: "有效期", value: coupon.validUntil },
+  ]);
+}
+
+function openOrder(order) {
+  setUserDetail("停车订单详情", order.plateNumber, [
+    { label: "停车场", value: order.site },
+    { label: "停车时长", value: order.duration },
+    { label: "实付金额", value: `¥ ${order.amount}` },
+    { label: "支付方式", value: order.channel },
+  ]);
+}
+
+function openNotice(notice) {
+  setUserDetail("服务提醒", notice.title, [
+    { label: "内容", value: notice.message },
+    { label: "时间", value: notice.time },
+  ]);
+}
+
+function openMembership() {
+  setUserDetail("月租服务", dashboard.userPortal.membership.plan, [
+    { label: "到期日期", value: dashboard.userPortal.membership.expiresAt },
+    { label: "绑定车位", value: dashboard.userPortal.membership.spaceCode },
+  ]);
+}
+
+async function handleCreateReservation() {
+  userActionLoading.reservation = true;
+  try {
+    const result = await api.createUserReservation(auth.token, reservationForm);
+    dashboard.userPortal = result.userPortal;
+    activeUserMenu.value = "reservations";
+    openReservation(result.reservation);
+    notify("预约成功", `${result.reservation.site} 已加入你的预约列表`);
+  } catch (error) {
+    notify("预约失败", error.message);
+  } finally {
+    userActionLoading.reservation = false;
+  }
+}
+
+async function handleUserCheckout() {
+  if (!canCheckout.value) {
+    notify("当前无待缴订单", "请先确认车辆已入场并存在待支付费用。");
+    return;
+  }
+  userActionLoading.checkout = true;
+  try {
+    const result = await api.checkoutUserParking(auth.token, checkoutForm);
+    dashboard.userPortal = result.userPortal;
+    activeUserMenu.value = "orders";
+    setUserDetail("离场缴费完成", result.payment.plateNumber, [
+      { label: "支付金额", value: `¥ ${result.bill.finalAmount}` },
+      { label: "支付渠道", value: result.payment.channel },
+      { label: "停车时长", value: dashboard.userPortal.activeParking.durationLabel },
+      { label: "当前状态", value: dashboard.userPortal.activeParking.billingStatus },
+    ]);
+    notify("缴费成功", `已支付 ¥ ${result.bill.finalAmount}，现在可以离场`);
+  } catch (error) {
+    notify("缴费失败", error.message);
+  } finally {
+    userActionLoading.checkout = false;
+  }
 }
 
 function logout() {
@@ -347,97 +531,264 @@ function logout() {
       </template>
     </section>
   </div>
-    <div v-else-if="isUserPortal" class="user-layout">
-    <header class="user-topbar">
-      <div>
+  <div v-else-if="isUserPortal" class="console-layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
         <p class="eyebrow">ParkSphere User</p>
-        <h1>??????</h1>
-        <p class="lead">??????????????????????????</p>
+        <h2>车主服务中心</h2>
+        <span>{{ auth.user?.name }} · {{ roleLabel }}</span>
       </div>
-      <div class="user-topbar-actions">
-        <div class="user-badge">
-          <strong>{{ auth.user?.name }}</strong>
-          <span>{{ roleLabel }}</span>
+
+      <nav class="sidebar-nav">
+        <button
+          v-for="item in userMenus"
+          :key="item.key"
+          class="sidebar-item"
+          :class="{ active: activeUserMenu === item.key }"
+          @click="selectUserMenu(item.key)"
+        >
+          <strong>{{ item.label }}</strong>
+          <span>{{ item.hint }}</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div>
+          <strong>当前车辆</strong>
+          <span>{{ dashboard.userPortal?.activeParking?.plateNumber || "暂无在场车辆" }}</span>
         </div>
-        <button class="secondary-button" @click="logout">????</button>
+        <button class="secondary-button wide" @click="logout">退出登录</button>
       </div>
-    </header>
+    </aside>
 
-    <section class="user-hero" v-if="dashboard.userPortal">
-      <div class="user-hero-main">
-        <p class="eyebrow">????</p>
-        <h2>{{ dashboard.userPortal.activeParking.plateNumber }}</h2>
-        <p>{{ dashboard.userPortal.activeParking.lotName }} ? {{ dashboard.userPortal.activeParking.spaceCode }} ? {{ dashboard.userPortal.activeParking.entryLabel }}</p>
-        <div class="user-actions">
-          <button class="primary-button" @click="handleUserAction('reserve')">????</button>
-          <button class="secondary-button" @click="handleUserAction('renew')">????</button>
-          <button class="secondary-button" @click="handleUserAction('invoice')">????</button>
+    <section class="console-main" v-if="dashboard.userPortal">
+      <header class="console-header">
+        <div>
+          <p class="eyebrow">{{ currentUserMenu?.hint }}</p>
+          <h1>{{ currentUserMenu?.label }}</h1>
         </div>
-      </div>
-      <div class="user-hero-side">
-        <div><span>????</span><strong>? {{ dashboard.userPortal.activeParking.currentAmount }}</strong></div>
-        <div><span>????</span><strong>{{ dashboard.userPortal.activeParking.durationLabel }}</strong></div>
-        <div><span>????</span><strong>{{ dashboard.userPortal.activeParking.billingStatus }}</strong></div>
-      </div>
-    </section>
+        <button class="secondary-button" @click="openSupport">联系客服</button>
+      </header>
 
-    <section class="user-summary-grid">
-      <article class="user-summary-card" v-for="card in userSummaryCards" :key="card.label">
-        <p>{{ card.label }}</p>
-        <strong>{{ card.value }}</strong>
-        <span>{{ card.hint }}</span>
-      </article>
-    </section>
-
-    <section class="user-grid" v-if="dashboard.userPortal">
-      <article class="module-card user-card">
-        <div class="module-header"><div><p class="eyebrow">????</p><h3>????</h3></div></div>
-        <div class="user-list">
-          <div class="user-list-item" v-for="item in dashboard.userPortal.reservations" :key="item.id">
-            <div><strong>{{ item.site }}</strong><p>{{ item.time }}</p></div>
-            <span class="tag-pill">{{ item.status }}</span>
+      <template v-if="activeUserMenu === 'overview'">
+        <section class="user-hero">
+          <div class="user-hero-main">
+            <p class="eyebrow">当前停车</p>
+            <h2>{{ dashboard.userPortal.activeParking.plateNumber }}</h2>
+            <p>{{ dashboard.userPortal.activeParking.lotName }} · {{ dashboard.userPortal.activeParking.spaceCode }} · {{ dashboard.userPortal.activeParking.entryLabel }}</p>
+            <div class="user-actions">
+              <button class="primary-button" @click="selectUserMenu('reservations')">预约车位</button>
+              <button class="secondary-button" @click="selectUserMenu('orders')">结束离场缴费</button>
+              <button class="secondary-button" @click="selectUserMenu('membership')">月租续费</button>
+            </div>
           </div>
-        </div>
-      </article>
-
-      <article class="module-card user-card">
-        <div class="module-header"><div><p class="eyebrow">????</p><h3>?????</h3></div></div>
-        <div class="coupon-stack">
-          <div class="coupon-card" v-for="coupon in dashboard.userPortal.coupons" :key="coupon.code">
-            <div><strong>{{ coupon.title }}</strong><p>{{ coupon.code }}</p></div>
-            <span>{{ coupon.validUntil }}</span>
+          <div class="user-hero-side">
+            <div><span>当前费用</span><strong>¥ {{ dashboard.userPortal.activeParking.currentAmount }}</strong></div>
+            <div><span>停车时长</span><strong>{{ dashboard.userPortal.activeParking.durationLabel }}</strong></div>
+            <div><span>支付状态</span><strong>{{ dashboard.userPortal.activeParking.billingStatus }}</strong></div>
           </div>
-        </div>
-      </article>
+        </section>
 
-      <article class="module-card user-card span-2">
-        <div class="module-header"><div><p class="eyebrow">????</p><h3>????</h3></div><button class="link-button" @click="handleUserAction('invoice')">????</button></div>
-        <div class="order-table">
-          <div class="order-row order-head"><span>??</span><span>???</span><span>??</span><span>??</span><span>????</span></div>
-          <div class="order-row" v-for="order in dashboard.userPortal.orders" :key="order.id">
-            <span>{{ order.plateNumber }}</span><span>{{ order.site }}</span><span>{{ order.duration }}</span><span>? {{ order.amount }}</span><span>{{ order.channel }}</span>
-          </div>
-        </div>
-      </article>
+        <section class="user-summary-grid">
+          <article class="user-summary-card interactive-card" v-for="card in userSummaryCards" :key="card.label" @click="openSummary(card)">
+            <p>{{ card.label }}</p>
+            <strong>{{ card.value }}</strong>
+            <span>{{ card.hint }}</span>
+          </article>
+        </section>
 
-      <article class="module-card user-card">
-        <div class="module-header"><div><p class="eyebrow">????</p><h3>?????</h3></div><button class="link-button" @click="handleUserAction('renew')">????</button></div>
-        <div class="user-meta-list">
-          <div><span>????</span><strong>{{ dashboard.userPortal.membership.plan }}</strong></div>
-          <div><span>????</span><strong>{{ dashboard.userPortal.membership.expiresAt }}</strong></div>
-          <div><span>????</span><strong>{{ dashboard.userPortal.membership.spaceCode }}</strong></div>
-        </div>
-      </article>
+        <section class="user-grid">
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">快速操作</p><h3>预约车位</h3></div></div>
+            <div class="user-form">
+              <label class="field"><span class="field-icon">位</span><input v-model="reservationForm.site" type="text" placeholder="输入预约车位或停车场位置" /></label>
+              <label class="field"><span class="field-icon">时</span><input v-model="reservationForm.time" type="text" placeholder="输入预约时段" /></label>
+              <button class="primary-button wide" :disabled="userActionLoading.reservation" @click="handleCreateReservation">
+                {{ userActionLoading.reservation ? "提交中..." : "提交预约" }}
+              </button>
+            </div>
+          </article>
 
-      <article class="module-card user-card">
-        <div class="module-header"><div><p class="eyebrow">????</p><h3>????</h3></div><button class="link-button" @click="handleUserAction('support')">????</button></div>
-        <div class="user-list">
-          <div class="user-list-item" v-for="notice in dashboard.userPortal.notices" :key="notice.id">
-            <div><strong>{{ notice.title }}</strong><p>{{ notice.message }}</p></div>
-            <span>{{ notice.time }}</span>
-          </div>
-        </div>
-      </article>
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">快速操作</p><h3>离场缴费</h3></div></div>
+            <div class="user-form">
+              <label class="field"><span class="field-icon">券</span><input v-model="checkoutForm.couponCode" type="text" placeholder="输入优惠券编码" /></label>
+              <label class="field"><span class="field-icon">付</span><select v-model="checkoutForm.paymentChannel"><option value="扫码支付">扫码支付</option><option value="无感支付">无感支付</option></select></label>
+              <button class="primary-button wide" :disabled="userActionLoading.checkout || !canCheckout" @click="handleUserCheckout">
+                {{ userActionLoading.checkout ? "结算中..." : canCheckout ? "完成缴费并离场" : "当前无待缴订单" }}
+              </button>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">消息中心</p><h3>服务提醒</h3></div></div>
+            <div class="user-list">
+              <div class="user-list-item interactive-row" v-for="notice in dashboard.userPortal.notices" :key="notice.id" @click="openNotice(notice)">
+                <div><strong>{{ notice.title }}</strong><p>{{ notice.message }}</p></div>
+                <span>{{ notice.time }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">预约车位</p><h3>最近预约</h3></div></div>
+            <div class="user-list">
+              <div class="user-list-item interactive-row" v-for="item in dashboard.userPortal.reservations" :key="item.id" @click="openReservation(item)">
+                <div><strong>{{ item.site }}</strong><p>{{ item.time }}</p></div>
+                <span class="tag-pill">{{ item.status }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">详情面板</p><h3>{{ userDetail.title }}</h3></div></div>
+            <div class="user-detail-card">
+              <strong>{{ userDetail.subtitle }}</strong>
+              <div class="user-meta-list">
+                <div v-for="item in userDetail.items" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
+
+      <template v-if="activeUserMenu === 'reservations'">
+        <section class="user-grid">
+          <article class="module-card user-card span-2">
+            <div class="module-header"><div><p class="eyebrow">预约车位</p><h3>预约记录</h3></div><button class="link-button" @click="syncUserDetail('reservations')">查看首条详情</button></div>
+            <div class="user-form compact">
+              <label class="field"><span class="field-icon">位</span><input v-model="reservationForm.site" type="text" placeholder="输入预约车位或停车场位置" /></label>
+              <label class="field"><span class="field-icon">时</span><input v-model="reservationForm.time" type="text" placeholder="输入预约时段" /></label>
+              <button class="primary-button" :disabled="userActionLoading.reservation" @click="handleCreateReservation">
+                {{ userActionLoading.reservation ? "提交中..." : "立即预约" }}
+              </button>
+            </div>
+            <div class="user-list">
+              <div class="user-list-item interactive-row" v-for="item in dashboard.userPortal.reservations" :key="item.id" @click="openReservation(item)">
+                <div><strong>{{ item.site }}</strong><p>{{ item.time }}</p></div>
+                <span class="tag-pill">{{ item.status }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">预约详情</p><h3>{{ userDetail.title }}</h3></div></div>
+            <div class="user-detail-card">
+              <strong>{{ userDetail.subtitle }}</strong>
+              <div class="user-meta-list">
+                <div v-for="item in userDetail.items" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
+
+      <template v-if="activeUserMenu === 'coupons'">
+        <section class="user-grid">
+          <article class="module-card user-card span-2">
+            <div class="module-header"><div><p class="eyebrow">优惠权益</p><h3>可用优惠券</h3></div></div>
+            <div class="coupon-stack">
+              <div class="coupon-card interactive-row" v-for="coupon in dashboard.userPortal.coupons" :key="coupon.code" @click="openCoupon(coupon)">
+                <div><strong>{{ coupon.title }}</strong><p>{{ coupon.code }}</p></div>
+                <span>{{ coupon.validUntil }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">优惠券详情</p><h3>{{ userDetail.title }}</h3></div></div>
+            <div class="user-detail-card">
+              <strong>{{ userDetail.subtitle }}</strong>
+              <div class="user-meta-list">
+                <div v-for="item in userDetail.items" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
+
+      <template v-if="activeUserMenu === 'orders'">
+        <section class="user-grid">
+          <article class="module-card user-card span-2">
+            <div class="module-header"><div><p class="eyebrow">停车记录</p><h3>最近订单</h3></div><button class="link-button" @click="openInvoiceGuide">开票说明</button></div>
+            <div class="user-form compact">
+              <label class="field"><span class="field-icon">券</span><input v-model="checkoutForm.couponCode" type="text" placeholder="输入优惠券编码" /></label>
+              <label class="field"><span class="field-icon">付</span><select v-model="checkoutForm.paymentChannel"><option value="扫码支付">扫码支付</option><option value="无感支付">无感支付</option></select></label>
+              <button class="primary-button" :disabled="userActionLoading.checkout || !canCheckout" @click="handleUserCheckout">
+                {{ userActionLoading.checkout ? "结算中..." : canCheckout ? "结束停车并缴费" : "当前无待缴订单" }}
+              </button>
+            </div>
+            <div class="order-table">
+              <div class="order-row order-head"><span>车牌</span><span>停车场</span><span>时长</span><span>金额</span><span>支付方式</span></div>
+              <div class="order-row interactive-row" v-for="order in dashboard.userPortal.orders" :key="order.id" @click="openOrder(order)">
+                <span>{{ order.plateNumber }}</span>
+                <span>{{ order.site }}</span>
+                <span>{{ order.duration }}</span>
+                <span>¥ {{ order.amount }}</span>
+                <span>{{ order.channel }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">订单详情</p><h3>{{ userDetail.title }}</h3></div></div>
+            <div class="user-detail-card">
+              <strong>{{ userDetail.subtitle }}</strong>
+              <div class="user-meta-list">
+                <div v-for="item in userDetail.items" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
+
+      <template v-if="activeUserMenu === 'membership'">
+        <section class="user-grid">
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">月租服务</p><h3>套餐信息</h3></div><button class="link-button" @click="openMembership">查看详情</button></div>
+            <div class="user-meta-list interactive-card" @click="openMembership()">
+              <div><span>套餐名称</span><strong>{{ dashboard.userPortal.membership.plan }}</strong></div>
+              <div><span>到期日期</span><strong>{{ dashboard.userPortal.membership.expiresAt }}</strong></div>
+              <div><span>绑定车位</span><strong>{{ dashboard.userPortal.membership.spaceCode }}</strong></div>
+            </div>
+          </article>
+
+          <article class="module-card user-card">
+            <div class="module-header"><div><p class="eyebrow">优惠权益</p><h3>续费可用券</h3></div></div>
+            <div class="coupon-stack">
+              <div class="coupon-card interactive-row" v-for="coupon in dashboard.userPortal.coupons" :key="coupon.code" @click="openCoupon(coupon)">
+                <div><strong>{{ coupon.title }}</strong><p>{{ coupon.code }}</p></div>
+                <span>{{ coupon.validUntil }}</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="module-card user-card span-2">
+            <div class="module-header"><div><p class="eyebrow">服务详情</p><h3>{{ userDetail.title }}</h3></div></div>
+            <div class="user-detail-card">
+              <strong>{{ userDetail.subtitle }}</strong>
+              <div class="user-meta-list">
+                <div v-for="item in userDetail.items" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
     </section>
   </div>
 
@@ -622,7 +973,3 @@ function logout() {
     </div>
   </div>
 </template>
-
-
-
-

@@ -49,8 +49,24 @@ function buildUserPortal(db, user) {
   return {
     viewType: "user",
     alerts: db.alerts.slice(0, 2),
-    userPortal: db.userPortals[user.sub],
+    userPortal: db.userPortals[user.sub] || null,
   };
+}
+
+function requireUserRole(req, res) {
+  if (req.user?.role !== "user") {
+    res.status(403).json({ message: "当前账号无权访问用户端操作" });
+    return false;
+  }
+  return true;
+}
+
+function formatDurationLabel(durationMinutes) {
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+  if (!hours) return `${minutes} 分`;
+  if (!minutes) return `${hours} 小时`;
+  return `${hours} 小时 ${minutes} 分`;
 }
 
 function dashboardPayload(db, user) {
@@ -215,6 +231,109 @@ app.put("/api/spaces/:code", authMiddleware, (req, res) => {
     map: db.spaces,
     overview: buildOverview(db.spaces),
   });
+});
+
+app.post("/api/user/reservations", authMiddleware, (req, res) => {
+  if (!requireUserRole(req, res)) return;
+
+  const db = readDb();
+  const portal = db.userPortals[req.user.sub];
+  const body = req.body || {};
+  if (!portal) {
+    return res.status(404).json({ message: "未找到用户端服务数据" });
+  }
+
+  const reservation = {
+    id: nextId("reserve"),
+    site: body.site || "星港商业中心 B1 层 08 号位",
+    time: body.time || "今天 20:00 - 23:00",
+    status: "已确认",
+  };
+
+  portal.reservations.unshift(reservation);
+  portal.notices.unshift({
+    id: nextId("notice"),
+    title: "预约成功",
+    message: `${reservation.site} 已为你锁定，请在预约时段内到场。`,
+    time: "刚刚",
+  });
+
+  writeDb(db);
+  res.json({ reservation, userPortal: portal });
+});
+
+app.post("/api/user/checkout", authMiddleware, (req, res) => {
+  if (!requireUserRole(req, res)) return;
+
+  const db = readDb();
+  const portal = db.userPortals[req.user.sub];
+  const body = req.body || {};
+  if (!portal) {
+    return res.status(404).json({ message: "未找到用户端服务数据" });
+  }
+
+  const activeParking = portal.activeParking;
+  if (!activeParking || activeParking.billingStatus === "已完成支付，可离场" || activeParking.billingStatus === "当前无在场车辆") {
+    return res.status(400).json({ message: "当前没有可结算的停车记录" });
+  }
+
+  const entry = db.entries.find(
+    (item) =>
+      item.status === "active" &&
+      item.plateNumber === activeParking.plateNumber &&
+      item.spaceCode === activeParking.spaceCode,
+  );
+
+  if (!entry) {
+    return res.status(404).json({ message: "未找到当前在场车辆记录" });
+  }
+
+  const coupon = findCoupon(db, body.couponCode);
+  const bill = calculateBill({ entry, pricing: db.pricing, coupon });
+
+  entry.status = "closed";
+  entry.exitTime = bill.exitTime;
+  entry.gateOut = "gate-east-out";
+  entry.billing = bill;
+  releaseSpace(db, entry.spaceCode);
+
+  const payment = {
+    id: nextId("pay"),
+    entryId: entry.id,
+    plateNumber: entry.plateNumber,
+    amount: bill.finalAmount,
+    discountAmount: bill.discountAmount,
+    channel: body.paymentChannel || "扫码支付",
+    createdAt: bill.exitTime,
+  };
+  db.payments.push(payment);
+
+  portal.orders.unshift({
+    id: payment.id,
+    plateNumber: entry.plateNumber,
+    site: activeParking.lotName,
+    duration: formatDurationLabel(bill.durationMinutes),
+    amount: bill.finalAmount,
+    channel: payment.channel,
+  });
+  portal.notices.unshift({
+    id: nextId("notice"),
+    title: "离场缴费完成",
+    message: `${entry.plateNumber} 已完成支付，可直接离场。`,
+    time: "刚刚",
+  });
+  portal.activeParking = {
+    plateNumber: entry.plateNumber,
+    lotName: activeParking.lotName,
+    spaceCode: entry.spaceCode,
+    entryLabel: "本次停车已完成结算",
+    durationLabel: formatDurationLabel(bill.durationMinutes),
+    currentAmount: 0,
+    billingStatus: "已完成支付，可离场",
+  };
+
+  writeDb(db);
+  res.json({ bill, payment, userPortal: portal });
 });
 
 app.post("/api/entries", authMiddleware, (req, res) => {

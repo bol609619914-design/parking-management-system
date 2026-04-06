@@ -289,11 +289,14 @@ h1, h2, h3, h4, p { margin: 0; }
 .user-topbar-actions { gap: 14px; }
 .user-badge { padding: 12px 16px; border-radius: 18px; background: rgba(0,113,227,0.06); border: 1px solid rgba(0,113,227,0.1); }
 .user-badge strong { display: block; }
+.user-hero { display: flex; align-items: stretch; justify-content: space-between; gap: 20px; }
+.user-hero-main { flex: 1; display: grid; gap: 12px; }
 .user-hero-main p { color: var(--muted); }
+.user-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .user-hero-side { display: grid; gap: 14px; min-width: 240px; }
 .user-hero-side div { padding: 16px 18px; border-radius: 18px; background: linear-gradient(180deg, #fafdff, #edf5ff); border: 1px solid rgba(0,113,227,0.08); }
 .user-hero-side span { color: var(--muted); display: block; margin-bottom: 6px; }
-.user-summary-grid, .user-grid { gap: 18px; flex-wrap: wrap; }
+.user-summary-grid, .user-grid { display: flex; gap: 18px; flex-wrap: wrap; }
 .user-summary-card { flex: 1 1 220px; padding: 24px; border-radius: 28px; }
 .user-summary-card strong { display: block; margin: 10px 0 8px; color: var(--blue); font-size: 2rem; }
 .user-card { flex: 1 1 320px; }
@@ -301,6 +304,12 @@ h1, h2, h3, h4, p { margin: 0; }
 .user-list, .user-meta-list, .coupon-stack, .order-table { display: grid; gap: 14px; }
 .user-list-item, .coupon-card, .order-row, .user-meta-list div { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-radius: 18px; background: linear-gradient(180deg, #fcfdff, #f2f8ff); border: 1px solid rgba(0,113,227,0.08); }
 .user-list-item strong, .coupon-card strong { color: var(--text); }
+.interactive-card, .interactive-row { cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
+.interactive-card:hover, .interactive-row:hover { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(0,113,227,0.10); border-color: rgba(0,113,227,0.18); }
+.user-detail-card { display: grid; gap: 14px; }
+.user-detail-card > strong { font-size: 1.25rem; color: var(--text); }
+.user-form { display: grid; gap: 14px; }
+.user-form.compact { grid-template-columns: 1.2fr 1fr auto; align-items: center; }
 .tag-pill { padding: 6px 12px; border-radius: 999px; background: rgba(0,113,227,0.1); color: var(--blue); font-weight: 600; }
 .order-row { display: grid; grid-template-columns: 1.1fr 1.5fr 0.9fr 0.8fr 1fr; }
 .order-head { background: rgba(0,113,227,0.06); color: var(--muted); font-weight: 600; }
@@ -314,5 +323,7 @@ h1, h2, h3, h4, p { margin: 0; }
   .parking-ops { grid-template-columns: 1fr; }
   .space-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .otp-row, .inline-fields, .order-row { grid-template-columns: 1fr; }
+  .user-form.compact { grid-template-columns: 1fr; }
   .notification-panel { position: static; width: 100%; margin-top: 12px; }
+  .user-card.span-2 { flex-basis: 100%; }
 }

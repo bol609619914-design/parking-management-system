@@ -1,12 +1,14 @@
 ﻿const API_BASE = "/api";
 
 async function request(path, options = {}) {
+  const mergedHeaders = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    headers: mergedHeaders,
   });
 
   if (!response.ok) {
@@ -72,6 +74,20 @@ export const api = {
   updateSpace(token, code, payload) {
     return request(`/spaces/${code}`, {
       method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+  createUserReservation(token, payload) {
+    return request("/user/reservations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+  },
+  checkoutUserParking(token, payload) {
+    return request("/user/checkout", {
+      method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     });

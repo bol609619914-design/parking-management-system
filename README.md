@@ -1,153 +1,152 @@
-# Parking Management System
+# 停车场管理系统
 
-A role-based parking management platform built with Vue 3 and Express for parking operators, merchants, and car owners. The project includes an authentication portal, an operator command center, entry and exit control, billing configuration, parking-space operations, a financial overview, and a user-facing service portal.
+一个基于 Vue 3 与 Express 的多角色停车场管理系统演示项目，覆盖管理员、商户端与车主端三类使用场景。项目内置认证门户、运营看板、出入管理、计费规则、车位管理、财务审计与车主服务中心，适合用于后台原型展示、课程作业、毕业设计和中小型系统演示。
 
-## Screenshots
+## 项目预览
 
-### Login Portal
-![Login Portal](./docs/images/login-screen.svg)
+### 管理端
+![管理端控制台](./docs/images/admin-console.png)
 
-### Admin Command Center
-![Admin Command Center](./docs/images/admin-console.svg)
+### 商户端
+![商户端控制台](./docs/images/merchant-console.png)
 
-### User Service Portal
-![User Service Portal](./docs/images/user-portal.svg)
+### 车主端
+![车主服务中心](./docs/images/user-portal.png)
 
-## Highlights
+## 核心能力
 
-- Role-based experience for administrators, merchants, and end users
-- Password login and SMS-code quick login with slider verification simulation
-- Registration workflow with merchant/admin review submission flow
-- OCR-based plate recognition simulation with whitelist and blacklist handling
-- Parking-space operations for reserve, occupy, release, and monthly assignment
-- Flexible billing configuration with free minutes, hourly rate, step rate, and fee cap
-- Financial dashboard with daily revenue, discount tracking, and trend modules
-- User portal with active parking details, reservations, coupons, billing history, and membership status
+- 多角色登录体验：支持管理员、商户端、车主端进入各自界面
+- 安全认证门户：账号密码登录、短信验证码登录、滑块验证、注册审核流程
+- 实时运营看板：车位总量、剩余车位、设备状态、分区占用、告警提示
+- 出入管理：OCR 识别模拟、白名单放行、黑名单拦截、入场建单、出场结算
+- 计费引擎：免费时长、按时计费、阶梯计费、封顶金额、优惠券抵扣
+- 车位管理：车位状态地图、预留、占用、释放、月租位切换
+- 财务审计：收入汇总、订单流水、趋势报表
+- 车主服务中心：预约车位、停车订单、优惠券、月租服务、离场缴费
 
-## Tech Stack
+## 技术栈
 
-- Frontend: Vue 3, Vite
-- Backend: Express 5
-- Authentication: JWT, bcryptjs
-- Data store: local JSON seed data for demo and development
+- 前端：Vue 3、Vite
+- 后端：Express 5
+- 认证：JWT、bcryptjs
+- 数据存储：本地 JSON 演示数据
 
-## Project Structure
+## 目录结构
 
 ```text
 parking-management-system/
-|- src/
-|  |- App.vue
-|  |- api.js
-|  - assets/
-|- server/
-|  |- data/db.json
-|  |- lib/
-|  - index.js
-|- docs/images/
-|- package.json
-- README.md
+├─ docs/
+│  └─ images/
+├─ server/
+│  ├─ data/
+│  │  └─ db.json
+│  ├─ lib/
+│  └─ index.js
+├─ src/
+│  ├─ assets/
+│  ├─ App.vue
+│  └─ api.js
+├─ LICENSE
+├─ package.json
+└─ README.md
 ```
 
-## Getting Started
+## 快速开始
 
-### Prerequisites
+### 环境要求
 
-- Node.js 20+
-- npm 10+
+- Node.js 20 及以上
+- npm 10 及以上
 
-### Install Dependencies
+### 安装依赖
 
 ```bash
 npm install
 ```
 
-### Start the Backend API
+### 启动后端
 
 ```bash
 node server/index.js
 ```
 
-The API runs by default at [http://localhost:5050](http://localhost:5050).
+默认地址为 [http://localhost:5050](http://localhost:5050)。
 
-### Start the Frontend
+### 启动前端
 
 ```bash
 npm run dev
 ```
 
-The Vite development server runs by default at [http://localhost:5173](http://localhost:5173).
+默认地址为 [http://localhost:5173](http://localhost:5173)。
 
-## Demo Accounts
+### 生产构建
 
-| Role | Account | Password |
+```bash
+npm run build
+```
+
+## 演示账号
+
+| 角色 | 账号 | 密码 |
 | --- | --- | --- |
-| Admin | `admin@parksphere.local` | `Admin@123` |
-| Merchant | `merchant@parksphere.local` | `Merchant@123` |
-| User | `user@parksphere.local` | `User@123` |
+| 管理员 | `admin@parksphere.local` | `Admin@123` |
+| 商户端 | `merchant@parksphere.local` | `Merchant@123` |
+| 车主端 | `user@parksphere.local` | `User@123` |
 
-SMS quick login test numbers:
+短信验证码测试号码：
 
-- `13800138000` ? `246810`
-- `13900139000` ? `135790`
-- `13700137000` ? `864209`
+- `13800138000`：`246810`
+- `13900139000`：`135790`
+- `13700137000`：`864209`
 
-## Core Modules
+## 功能模块
 
-### Authentication and Security Portal
+### 1. 认证与安全门户
 
-- Password login and SMS-code quick login
-- Remember-me option and slider verification simulation
-- Registration workflow for merchant and admin roles
+- 账号密码登录
+- 手机验证码快捷登录
+- 记住我、忘记密码、注册审核流程
+- 滑块验证交互演示
 
-### Command Center
+### 2. 管理端与商户端控制台
 
-- Parking-space overview and occupancy snapshot
-- Device alerts and notification center
-- Revenue and utilization summary cards
+- 指挥中心总览
+- 出入管理与 OCR 识别
+- 计费规则配置
+- 车位状态操作
+- 财务统计与报表概览
 
-### Entry and Exit Control
+### 3. 车主端服务中心
 
-- OCR recognition simulation with manual correction support
-- Whitelist auto-pass and blacklist interception flow
-- Entry creation and exit settlement APIs
+- 当前停车状态
+- 预约车位提交与记录查看
+- 离场缴费
+- 优惠券与服务提醒
+- 月租服务信息
 
-### Billing Engine
+## 主要接口
 
-- Free minutes, hourly billing, step billing, and capped amount configuration
-- Coupon deduction during checkout
-- QR-style payment presentation for operator workflow demos
-
-### Space Operations
-
-- Interactive parking-space map
-- Support for reserve, occupy, release, and monthly-space conversion
-- Available to both admin and merchant dashboards
-
-### User Service Portal
-
-- Active parking session details
-- Upcoming reservations and service notices
-- Coupon wallet and recent order history
-- Monthly membership status and renewal entry points
-
-## API Overview
-
-| Method | Endpoint | Description |
+| 方法 | 地址 | 说明 |
 | --- | --- | --- |
-| POST | `/api/auth/login` | Login with password or OTP |
-| POST | `/api/auth/send-otp` | Request demo OTP |
-| POST | `/api/auth/register` | Submit merchant/admin registration |
-| GET | `/api/dashboard` | Load role-based dashboard payload |
-| POST | `/api/ocr/recognize` | Simulate OCR plate recognition |
-| POST | `/api/entries` | Create a parking entry record |
-| POST | `/api/exits` | Create an exit settlement |
-| PUT | `/api/billing/config` | Update billing rules |
-| PUT | `/api/spaces/:code` | Update parking-space state |
+| POST | `/api/auth/login` | 密码或验证码登录 |
+| POST | `/api/auth/send-otp` | 获取演示验证码 |
+| POST | `/api/auth/register` | 提交注册审核 |
+| GET | `/api/dashboard` | 获取当前角色首页数据 |
+| POST | `/api/ocr/recognize` | 模拟车牌识别 |
+| POST | `/api/entries` | 创建入场记录 |
+| POST | `/api/exits` | 创建出场结算 |
+| PUT | `/api/billing/config` | 更新计费配置 |
+| PUT | `/api/spaces/:code` | 更新车位状态 |
+| POST | `/api/user/reservations` | 车主端提交预约 |
+| POST | `/api/user/checkout` | 车主端离场缴费 |
 
-## Notes for Production Use
+## 开发说明
 
-This repository ships with local seed data for demo and development. For a production deployment, replace the JSON data store with a database, move secrets to environment variables, and integrate a real OCR provider, payment service, and device gateway.
+- 当前仓库默认使用本地 JSON 数据，适合演示与开发联调
+- 如需生产化部署，建议替换为数据库、对象存储、真实 OCR 服务与支付网关
+- 认证密钥、第三方服务地址等敏感配置应迁移到环境变量
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+本项目采用 [MIT License](./LICENSE) 开源协议。
