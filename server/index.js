@@ -1,10 +1,11 @@
-﻿import express from "express";
+﻿import "dotenv/config";
+import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readDb, writeDb, nextId } from "./lib/store.js";
+import { isDatabaseEnabled, readDb, writeDb, nextId } from "./lib/store.js";
 import { calculateBill, buildFinance, buildReports } from "./lib/billing.js";
 import { recognizeVehicle } from "./lib/ocr.js";
 
@@ -152,11 +153,15 @@ function updateSpaceState(space, action) {
 }
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, now: new Date().toISOString() });
+  res.json({
+    ok: true,
+    now: new Date().toISOString(),
+    storage: isDatabaseEnabled() ? "mysql" : "json",
+  });
 });
 
-app.post("/api/auth/send-otp", (req, res) => {
-  const db = readDb();
+app.post("/api/auth/send-otp", async (req, res) => {
+  const db = await readDb();
   const phone = req.body?.phone;
   if (!phone) {
     return res.status(400).json({ message: "请输入手机号" });
@@ -165,8 +170,8 @@ app.post("/api/auth/send-otp", (req, res) => {
   res.json({ phone, code, expiresIn: 300 });
 });
 
-app.post("/api/auth/reset-password", (req, res) => {
-  const db = readDb();
+app.post("/api/auth/reset-password", async (req, res) => {
+  const db = await readDb();
   const { phone, otp, newPassword } = req.body || {};
   const user = db.users.find((item) => item.phone === phone);
 
@@ -187,12 +192,12 @@ app.post("/api/auth/reset-password", (req, res) => {
   }
 
   user.passwordHash = bcrypt.hashSync(newPassword, 10);
-  writeDb(db);
+  await writeDb(db);
   res.json({ ok: true, message: "密码已重置，请使用新密码登录" });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  const db = readDb();
+app.post("/api/auth/login", async (req, res) => {
+  const db = await readDb();
   const { mode, identifier, password, phone, otp } = req.body || {};
 
   let user = null;
@@ -222,8 +227,8 @@ app.post("/api/auth/login", (req, res) => {
   });
 });
 
-app.post("/api/auth/register", (req, res) => {
-  const db = readDb();
+app.post("/api/auth/register", async (req, res) => {
+  const db = await readDb();
   const { applicant, email, role, siteName, siteCode, agreement } = req.body || {};
   if (!agreement) {
     return res.status(400).json({ message: "请先勾选服务协议" });
@@ -240,29 +245,29 @@ app.post("/api/auth/register", (req, res) => {
     status: "pending",
     createdAt: new Date().toISOString(),
   });
-  writeDb(db);
+  await writeDb(db);
   res.json({ applicationId, status: "pending" });
 });
 
-app.get("/api/dashboard", authMiddleware, (req, res) => {
-  const db = readDb();
+app.get("/api/dashboard", authMiddleware, async (req, res) => {
+  const db = await readDb();
   res.json(dashboardPayload(db, req.user));
 });
 
-app.post("/api/ocr/recognize", authMiddleware, (req, res) => {
+app.post("/api/ocr/recognize", authMiddleware, async (req, res) => {
   if (!requireConsoleRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const result = recognizeVehicle(req.body || {}, db.vehicleProfiles);
   db.lastOcr = result;
-  writeDb(db);
+  await writeDb(db);
   res.json(result);
 });
 
-app.put("/api/spaces/:code", authMiddleware, (req, res) => {
+app.put("/api/spaces/:code", authMiddleware, async (req, res) => {
   if (!requireConsoleRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const space = db.spaces.find((item) => item.code === req.params.code);
   if (!space) {
     return res.status(404).json({ message: "\u672a\u627e\u5230\u5bf9\u5e94\u8f66\u4f4d" });
@@ -274,7 +279,7 @@ app.put("/api/spaces/:code", authMiddleware, (req, res) => {
     return res.status(400).json({ message: error.message });
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({
     space,
     map: db.spaces,
@@ -282,10 +287,10 @@ app.put("/api/spaces/:code", authMiddleware, (req, res) => {
   });
 });
 
-app.post("/api/user/reservations", authMiddleware, (req, res) => {
+app.post("/api/user/reservations", authMiddleware, async (req, res) => {
   if (!requireUserRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const portal = db.userPortals[req.user.sub];
   const body = req.body || {};
   if (!portal) {
@@ -307,14 +312,14 @@ app.post("/api/user/reservations", authMiddleware, (req, res) => {
     time: "刚刚",
   });
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ reservation, userPortal: portal });
 });
 
-app.post("/api/user/checkout", authMiddleware, (req, res) => {
+app.post("/api/user/checkout", authMiddleware, async (req, res) => {
   if (!requireUserRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const portal = db.userPortals[req.user.sub];
   const body = req.body || {};
   if (!portal) {
@@ -381,26 +386,26 @@ app.post("/api/user/checkout", authMiddleware, (req, res) => {
     billingStatus: "已完成支付，可离场",
   };
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ bill, payment, userPortal: portal });
 });
 
-app.post("/api/entries", authMiddleware, (req, res) => {
+app.post("/api/entries", authMiddleware, async (req, res) => {
   if (!requireConsoleRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const body = req.body || {};
   const ocr = recognizeVehicle({ gateId: body.gateId, imageHint: body.plateNumber }, db.vehicleProfiles);
   db.lastOcr = ocr;
 
   if (ocr.listType === "blacklist") {
-    writeDb(db);
+    await writeDb(db);
     return res.status(403).json({ message: ocr.gateActionMessage });
   }
 
   const existing = db.entries.find((entry) => entry.status === "active" && entry.plateNumber.replace(/\s+/g, "") === ocr.plateNumber.replace(/\s+/g, ""));
   if (existing) {
-    writeDb(db);
+    await writeDb(db);
     return res.status(409).json({ message: "该车辆已在场内，无需重复入场" });
   }
 
@@ -420,14 +425,14 @@ app.post("/api/entries", authMiddleware, (req, res) => {
   };
 
   db.entries.push(entry);
-  writeDb(db);
+  await writeDb(db);
   res.json({ entry, ocr, message: ocr.gateActionMessage, overview: buildOverview(db.spaces) });
 });
 
-app.post("/api/exits", authMiddleware, (req, res) => {
+app.post("/api/exits", authMiddleware, async (req, res) => {
   if (!requireConsoleRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const body = req.body || {};
   const entry = db.entries.find((item) => item.status === "active" && (item.id === body.entryId || item.plateNumber === body.plateNumber));
   if (!entry) {
@@ -454,14 +459,14 @@ app.post("/api/exits", authMiddleware, (req, res) => {
   };
 
   db.payments.push(payment);
-  writeDb(db);
+  await writeDb(db);
   res.json({ bill, payment, overview: buildOverview(db.spaces) });
 });
 
-app.put("/api/billing/config", authMiddleware, (req, res) => {
+app.put("/api/billing/config", authMiddleware, async (req, res) => {
   if (!requireAdminRole(req, res)) return;
 
-  const db = readDb();
+  const db = await readDb();
   const body = req.body || {};
   db.pricing = {
     ...db.pricing,
@@ -472,7 +477,7 @@ app.put("/api/billing/config", authMiddleware, (req, res) => {
     capAmount: Number(body.capAmount),
     nightRate: Number(body.nightRate || db.pricing.nightRate),
   };
-  writeDb(db);
+  await writeDb(db);
   res.json(db.pricing);
 });
 

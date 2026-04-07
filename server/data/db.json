@@ -205,16 +205,7 @@
       "entryTime": "2026-04-06T18:12:00.000Z",
       "gateIn": "gate-east-in",
       "spaceCode": "B-03",
-      "status": "closed",
-      "exitTime": "2026-04-06T23:49:40.456Z",
-      "gateOut": "gate-east-out",
-      "billing": {
-        "durationMinutes": 338,
-        "rawAmount": 44,
-        "discountAmount": 20,
-        "finalAmount": 24,
-        "exitTime": "2026-04-06T23:49:40.456Z"
-      }
+      "status": "active"
     },
     {
       "id": "entry-live-2",
@@ -262,15 +253,6 @@
       "discountAmount": 20,
       "channel": "扫码支付",
       "createdAt": "2026-04-06T11:27:44.922Z"
-    },
-    {
-      "id": "pay-1775519380456-qjb3r3",
-      "entryId": "entry-live-1",
-      "plateNumber": "粤A A839Q",
-      "amount": 24,
-      "discountAmount": 20,
-      "channel": "扫码支付",
-      "createdAt": "2026-04-06T23:49:40.456Z"
     }
   ],
   "otp": {
@@ -311,10 +293,10 @@
         "plateNumber": "粤A A839Q",
         "lotName": "星港商业中心停车场",
         "spaceCode": "B-03",
-        "entryLabel": "本次停车已完成结算",
-        "durationLabel": "5 小时 38 分",
-        "currentAmount": 0,
-        "billingStatus": "已完成支付，可离场"
+        "entryLabel": "今天 02:12 入场",
+        "durationLabel": "已停车 5 小时 18 分",
+        "currentAmount": 20,
+        "billingStatus": "待缴费后离场"
       },
       "reservations": [
         {
@@ -366,14 +348,6 @@
       ],
       "orders": [
         {
-          "id": "pay-1775519380456-qjb3r3",
-          "plateNumber": "粤A A839Q",
-          "site": "星港商业中心停车场",
-          "duration": "5 小时 38 分",
-          "amount": 24,
-          "channel": "扫码支付"
-        },
-        {
           "id": "order-0",
           "plateNumber": "粤A A839Q",
           "site": "星港商业中心停车场",
@@ -412,12 +386,6 @@
         "spaceCode": "B-03"
       },
       "notices": [
-        {
-          "id": "notice-1775519380456-0vxw2h",
-          "title": "离场缴费完成",
-          "message": "粤A A839Q 已完成支付，可直接离场。",
-          "time": "刚刚"
-        },
         {
           "id": "notice-demo-1",
           "title": "待离场缴费",

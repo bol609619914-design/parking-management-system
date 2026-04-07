@@ -1,17 +1,29 @@
-﻿import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readJsonDb, readSeedDb, writeJsonDb } from "./jsonStore.js";
+import { readDbFromPrisma, writeDbToPrisma } from "./prismaStore.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "../data/db.json");
-
-export function readDb() {
-  const raw = fs.readFileSync(dbPath, "utf8").replace(/^\uFEFF/, "");
-  return JSON.parse(raw);
+export function isDatabaseEnabled() {
+  return Boolean(process.env.DATABASE_URL);
 }
 
-export function writeDb(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), "utf8");
+export async function readDb() {
+  if (!isDatabaseEnabled()) {
+    return readJsonDb();
+  }
+
+  return readDbFromPrisma();
+}
+
+export async function writeDb(data) {
+  if (!isDatabaseEnabled()) {
+    writeJsonDb(data);
+    return;
+  }
+
+  await writeDbToPrisma(data);
+}
+
+export function loadSeedDb() {
+  return readSeedDb();
 }
 
 export function nextId(prefix) {

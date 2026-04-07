@@ -29,7 +29,8 @@
 - 前端：Vue 3、Vite
 - 后端：Express 5
 - 认证：JWT、bcryptjs
-- 数据存储：本地 JSON 演示数据
+- ORM / 数据访问：Prisma 7、`@prisma/adapter-mariadb`
+- 数据存储：MySQL 8（支持保留 JSON 演示模式作为本地降级方案）
 
 ## 目录结构
 
@@ -37,6 +38,9 @@
 parking-management-system/
 ├─ docs/
 │  └─ images/
+├─ prisma/
+│  ├─ schema.prisma
+│  └─ seed.js
 ├─ server/
 │  ├─ data/
 │  │  └─ db.json
@@ -46,8 +50,10 @@ parking-management-system/
 │  ├─ assets/
 │  ├─ App.vue
 │  └─ api.js
+├─ .env.example
 ├─ LICENSE
 ├─ package.json
+├─ prisma.config.ts
 └─ README.md
 ```
 
@@ -62,6 +68,28 @@ parking-management-system/
 
 ```bash
 npm install
+```
+
+### 配置数据库
+
+如需启用 MySQL + Prisma，请先复制环境变量模板并填写你的数据库账号密码：
+
+```bash
+copy .env.example .env
+```
+
+推荐数据库连接串示例：
+
+```env
+DATABASE_URL="mysql://root:your_password@127.0.0.1:3306/parking_management_system"
+```
+
+首次接入 MySQL 时，执行以下命令初始化表结构并导入演示数据：
+
+```bash
+npm run prisma:generate
+npm run prisma:push
+npm run db:seed
 ```
 
 ### 启动后端
@@ -143,9 +171,12 @@ npm run build
 
 ## 开发说明
 
-- 当前仓库默认使用本地 JSON 数据，适合演示与开发联调
-- 如需生产化部署，建议替换为数据库、对象存储、真实 OCR 服务与支付网关
-- 认证密钥、第三方服务地址等敏感配置应迁移到环境变量
+- 当前仓库支持两种数据模式：
+- 未设置 `DATABASE_URL` 时，后端继续使用 `server/data/db.json`，适合演示与本地联调。
+- 设置 `DATABASE_URL` 后，后端会切换到 MySQL + Prisma 存储层。
+- `prisma/seed.js` 会把当前演示数据导入 MySQL，便于快速得到可登录、可预约、可缴费的初始化环境。
+- 如需生产化部署，建议进一步接入真实 OCR 服务、对象存储、支付网关与更细粒度的权限体系。
+- 认证密钥、数据库账号、第三方服务地址等敏感配置应统一放入环境变量。
 
 ## License
 

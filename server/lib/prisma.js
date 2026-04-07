@@ -1,0 +1,41 @@
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis;
+
+function buildAdapterConfig() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("缺少 DATABASE_URL，无法初始化 Prisma MySQL 连接");
+  }
+
+  const url = new URL(process.env.DATABASE_URL);
+  return {
+    host: url.hostname,
+    port: url.port ? Number(url.port) : 3306,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: url.pathname.replace(/^\//, "") || undefined,
+    ...(url.searchParams.get("connection_limit")
+      ? { connectionLimit: Number(url.searchParams.get("connection_limit")) }
+      : {}),
+  };
+}
+
+export function getPrismaClient() {
+  if (!globalForPrisma.__parkspherePrisma) {
+    const adapter = new PrismaMariaDb(buildAdapterConfig());
+    globalForPrisma.__parkspherePrisma = new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    });
+  }
+
+  return globalForPrisma.__parkspherePrisma;
+}
+
+export async function disconnectPrisma() {
+  if (globalForPrisma.__parkspherePrisma) {
+    await globalForPrisma.__parkspherePrisma.$disconnect();
+    globalForPrisma.__parkspherePrisma = undefined;
+  }
+}

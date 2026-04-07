@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id           String      @id
+  sortOrder    Int         @default(0) @map("sort_order")
+  name         String
+  role         String
+  email        String      @unique
+  phone        String      @unique
+  passwordHash String      @map("password_hash")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  userPortal   UserPortal?
+
+  @@map("users")
+}
+
+model Application {
+  id         String   @id
+  sortOrder  Int      @default(0) @map("sort_order")
+  applicant  String
+  email      String
+  role       String
+  siteName   String   @map("site_name")
+  siteCode   String   @map("site_code")
+  status     String
+  createdAt  DateTime @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("applications")
+}
+
+model PricingConfig {
+  id          Int      @id
+  freeMinutes Int      @map("free_minutes")
+  hourlyRate  Int      @map("hourly_rate")
+  stepMinutes Int      @map("step_minutes")
+  stepRate    Int      @map("step_rate")
+  capAmount   Int      @map("cap_amount")
+  nightRate   Int      @map("night_rate")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("pricing_configs")
+}
+
+model Gate {
+  id        String   @id
+  sortOrder Int      @default(0) @map("sort_order")
+  name      String
+  status    String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("gates")
+}
+
+model Alert {
+  id        String   @id
+  sortOrder Int      @default(0) @map("sort_order")
+  title     String
+  message   String
+  level     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("alerts")
+}
+
+model Space {
+  code      String   @id
+  sortOrder Int      @default(0) @map("sort_order")
+  status    String
+  type      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("spaces")
+}
+
+model VehicleProfile {
+  plateNumber String  @id @map("plate_number")
+  listType    String  @map("list_type")
+  owner       String
+  vehicleType String  @map("vehicle_type")
+  reason      String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("vehicle_profiles")
+}
+
+model Coupon {
+  code      String   @id
+  sortOrder Int      @default(0) @map("sort_order")
+  type      String
+  value     Int
+  name      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("coupons")
+}
+
+model Entry {
+  id         String    @id
+  sortOrder  Int       @default(0) @map("sort_order")
+  plateNumber String   @map("plate_number")
+  plateType  String    @map("plate_type")
+  entryTime  DateTime  @map("entry_time")
+  exitTime   DateTime? @map("exit_time")
+  gateIn     String    @map("gate_in")
+  gateOut    String?   @map("gate_out")
+  spaceCode  String    @map("space_code")
+  status     String
+  billing    Json?
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("entries")
+}
+
+model Payment {
+  id             String   @id
+  sortOrder      Int      @default(0) @map("sort_order")
+  entryId        String   @map("entry_id")
+  plateNumber    String   @map("plate_number")
+  amount         Float
+  discountAmount Float    @map("discount_amount")
+  channel        String
+  createdAt      DateTime @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("payments")
+}
+
+model OtpCode {
+  phone     String   @id
+  code      String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("otp_codes")
+}
+
+model OcrSnapshot {
+  id                Int      @id
+  gateId            String?  @map("gate_id")
+  plateNumber       String?  @map("plate_number")
+  normalizedPlate   String?  @map("normalized_plate")
+  confidence        Int?
+  provider          String?
+  listType          String?  @map("list_type")
+  vehicleType       String?  @map("vehicle_type")
+  gateActionMessage String?  @map("gate_action_message")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("ocr_snapshots")
+}
+
+model UserPortal {
+  userId        String   @id @map("user_id")
+  summary       Json
+  activeParking Json     @map("active_parking")
+  reservations  Json
+  coupons       Json
+  orders        Json
+  membership    Json
+  notices       Json
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_portals")
+}
