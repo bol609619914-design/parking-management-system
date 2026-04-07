@@ -100,7 +100,7 @@ export async function readDbFromPrisma() {
     otpCodes,
     ocrSnapshot,
     userPortals,
-  ] = await prisma.$transaction([
+  ] = await Promise.all([
     prisma.user.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.application.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.pricingConfig.findFirst(),
@@ -189,183 +189,181 @@ export async function readDbFromPrisma() {
 
 export async function writeDbToPrisma(data) {
   const prisma = getPrismaClient();
-  await prisma.$transaction(async (tx) => {
-    await tx.userPortal.deleteMany();
-    await tx.payment.deleteMany();
-    await tx.entry.deleteMany();
-    await tx.application.deleteMany();
-    await tx.otpCode.deleteMany();
-    await tx.alert.deleteMany();
-    await tx.gate.deleteMany();
-    await tx.space.deleteMany();
-    await tx.vehicleProfile.deleteMany();
-    await tx.coupon.deleteMany();
-    await tx.ocrSnapshot.deleteMany();
-    await tx.pricingConfig.deleteMany();
-    await tx.user.deleteMany();
+  await prisma.userPortal.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.entry.deleteMany();
+  await prisma.application.deleteMany();
+  await prisma.otpCode.deleteMany();
+  await prisma.alert.deleteMany();
+  await prisma.gate.deleteMany();
+  await prisma.space.deleteMany();
+  await prisma.vehicleProfile.deleteMany();
+  await prisma.coupon.deleteMany();
+  await prisma.ocrSnapshot.deleteMany();
+  await prisma.pricingConfig.deleteMany();
+  await prisma.user.deleteMany();
 
-    await createManyIfAny(
-      tx.user,
-      (data.users || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        name: row.name,
-        role: row.role,
-        email: row.email,
-        phone: row.phone,
-        passwordHash: row.passwordHash,
-      })),
-    );
+  await createManyIfAny(
+    prisma.user,
+    (data.users || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      name: row.name,
+      role: row.role,
+      email: row.email,
+      phone: row.phone,
+      passwordHash: row.passwordHash,
+    })),
+  );
 
-    await createManyIfAny(
-      tx.application,
-      (data.applications || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        applicant: row.applicant,
-        email: row.email,
-        role: row.role,
-        siteName: row.siteName,
-        siteCode: row.siteCode,
-        status: row.status,
-        createdAt: dateOrNow(row.createdAt),
-      })),
-    );
+  await createManyIfAny(
+    prisma.application,
+    (data.applications || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      applicant: row.applicant,
+      email: row.email,
+      role: row.role,
+      siteName: row.siteName,
+      siteCode: row.siteCode,
+      status: row.status,
+      createdAt: dateOrNow(row.createdAt),
+    })),
+  );
 
-    if (data.pricing) {
-      await tx.pricingConfig.create({
-        data: {
-          id: 1,
-          freeMinutes: Number(data.pricing.freeMinutes),
-          hourlyRate: Number(data.pricing.hourlyRate),
-          stepMinutes: Number(data.pricing.stepMinutes),
-          stepRate: Number(data.pricing.stepRate),
-          capAmount: Number(data.pricing.capAmount),
-          nightRate: Number(data.pricing.nightRate),
-        },
-      });
-    }
+  if (data.pricing) {
+    await prisma.pricingConfig.create({
+      data: {
+        id: 1,
+        freeMinutes: Number(data.pricing.freeMinutes),
+        hourlyRate: Number(data.pricing.hourlyRate),
+        stepMinutes: Number(data.pricing.stepMinutes),
+        stepRate: Number(data.pricing.stepRate),
+        capAmount: Number(data.pricing.capAmount),
+        nightRate: Number(data.pricing.nightRate),
+      },
+    });
+  }
 
-    await createManyIfAny(
-      tx.gate,
-      (data.gates || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        name: row.name,
-        status: row.status,
-      })),
-    );
+  await createManyIfAny(
+    prisma.gate,
+    (data.gates || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      name: row.name,
+      status: row.status,
+    })),
+  );
 
-    await createManyIfAny(
-      tx.alert,
-      (data.alerts || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        title: row.title,
-        message: row.message,
-        level: row.level,
-      })),
-    );
+  await createManyIfAny(
+    prisma.alert,
+    (data.alerts || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      title: row.title,
+      message: row.message,
+      level: row.level,
+    })),
+  );
 
-    await createManyIfAny(
-      tx.space,
-      (data.spaces || []).map((row, index) => ({
-        code: row.code,
-        sortOrder: index,
-        status: row.status,
-        type: row.type,
-      })),
-    );
+  await createManyIfAny(
+    prisma.space,
+    (data.spaces || []).map((row, index) => ({
+      code: row.code,
+      sortOrder: index,
+      status: row.status,
+      type: row.type,
+    })),
+  );
 
-    await createManyIfAny(
-      tx.vehicleProfile,
-      Object.entries(data.vehicleProfiles || {}).map(([plateNumber, row]) => ({
-        plateNumber,
-        listType: row.listType,
-        owner: row.owner,
-        vehicleType: row.vehicleType,
-        ...(row.reason ? { reason: row.reason } : {}),
-      })),
-    );
+  await createManyIfAny(
+    prisma.vehicleProfile,
+    Object.entries(data.vehicleProfiles || {}).map(([plateNumber, row]) => ({
+      plateNumber,
+      listType: row.listType,
+      owner: row.owner,
+      vehicleType: row.vehicleType,
+      ...(row.reason ? { reason: row.reason } : {}),
+    })),
+  );
 
-    await createManyIfAny(
-      tx.coupon,
-      (data.coupons || []).map((row, index) => ({
-        code: row.code,
-        sortOrder: index,
-        type: row.type,
-        value: Number(row.value),
-        name: row.name,
-      })),
-    );
+  await createManyIfAny(
+    prisma.coupon,
+    (data.coupons || []).map((row, index) => ({
+      code: row.code,
+      sortOrder: index,
+      type: row.type,
+      value: Number(row.value),
+      name: row.name,
+    })),
+  );
 
-    await createManyIfAny(
-      tx.entry,
-      (data.entries || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        plateNumber: row.plateNumber,
-        plateType: row.plateType,
-        entryTime: dateOrNow(row.entryTime),
-        gateIn: row.gateIn,
-        spaceCode: row.spaceCode,
-        status: row.status,
-        ...(row.exitTime ? { exitTime: dateOrNow(row.exitTime) } : {}),
-        ...(row.gateOut ? { gateOut: row.gateOut } : {}),
-        ...(row.billing ? { billing: row.billing } : {}),
-      })),
-    );
+  await createManyIfAny(
+    prisma.entry,
+    (data.entries || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      plateNumber: row.plateNumber,
+      plateType: row.plateType,
+      entryTime: dateOrNow(row.entryTime),
+      gateIn: row.gateIn,
+      spaceCode: row.spaceCode,
+      status: row.status,
+      ...(row.exitTime ? { exitTime: dateOrNow(row.exitTime) } : {}),
+      ...(row.gateOut ? { gateOut: row.gateOut } : {}),
+      ...(row.billing ? { billing: row.billing } : {}),
+    })),
+  );
 
-    await createManyIfAny(
-      tx.payment,
-      (data.payments || []).map((row, index) => ({
-        id: row.id,
-        sortOrder: index,
-        entryId: row.entryId,
-        plateNumber: row.plateNumber,
-        amount: Number(row.amount),
-        discountAmount: Number(row.discountAmount),
-        channel: row.channel,
-        createdAt: dateOrNow(row.createdAt),
-      })),
-    );
+  await createManyIfAny(
+    prisma.payment,
+    (data.payments || []).map((row, index) => ({
+      id: row.id,
+      sortOrder: index,
+      entryId: row.entryId,
+      plateNumber: row.plateNumber,
+      amount: Number(row.amount),
+      discountAmount: Number(row.discountAmount),
+      channel: row.channel,
+      createdAt: dateOrNow(row.createdAt),
+    })),
+  );
 
-    await createManyIfAny(
-      tx.otpCode,
-      Object.entries(data.otp || {}).map(([phone, code]) => ({
-        phone,
-        code,
-      })),
-    );
+  await createManyIfAny(
+    prisma.otpCode,
+    Object.entries(data.otp || {}).map(([phone, code]) => ({
+      phone,
+      code,
+    })),
+  );
 
-    if (data.lastOcr) {
-      await tx.ocrSnapshot.create({
-        data: {
-          id: 1,
-          gateId: data.lastOcr.gateId,
-          plateNumber: data.lastOcr.plateNumber,
-          normalizedPlate: data.lastOcr.normalizedPlate,
-          confidence: data.lastOcr.confidence,
-          provider: data.lastOcr.provider,
-          listType: data.lastOcr.listType,
-          vehicleType: data.lastOcr.vehicleType,
-          gateActionMessage: data.lastOcr.gateActionMessage,
-        },
-      });
-    }
+  if (data.lastOcr) {
+    await prisma.ocrSnapshot.create({
+      data: {
+        id: 1,
+        gateId: data.lastOcr.gateId,
+        plateNumber: data.lastOcr.plateNumber,
+        normalizedPlate: data.lastOcr.normalizedPlate,
+        confidence: data.lastOcr.confidence,
+        provider: data.lastOcr.provider,
+        listType: data.lastOcr.listType,
+        vehicleType: data.lastOcr.vehicleType,
+        gateActionMessage: data.lastOcr.gateActionMessage,
+      },
+    });
+  }
 
-    await createManyIfAny(
-      tx.userPortal,
-      Object.entries(data.userPortals || {}).map(([userId, portal]) => ({
-        userId,
-        summary: portal.summary || [],
-        activeParking: portal.activeParking || {},
-        reservations: portal.reservations || [],
-        coupons: portal.coupons || [],
-        orders: portal.orders || [],
-        membership: portal.membership || {},
-        notices: portal.notices || [],
-      })),
-    );
-  });
+  await createManyIfAny(
+    prisma.userPortal,
+    Object.entries(data.userPortals || {}).map(([userId, portal]) => ({
+      userId,
+      summary: portal.summary || [],
+      activeParking: portal.activeParking || {},
+      reservations: portal.reservations || [],
+      coupons: portal.coupons || [],
+      orders: portal.orders || [],
+      membership: portal.membership || {},
+      notices: portal.notices || [],
+    })),
+  );
 }

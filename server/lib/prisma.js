@@ -9,12 +9,18 @@ function buildAdapterConfig() {
   }
 
   const url = new URL(process.env.DATABASE_URL);
+  const allowPublicKeyRetrieval = url.searchParams.get("allowPublicKeyRetrieval");
+  const ssl = url.searchParams.get("ssl");
   return {
     host: url.hostname,
     port: url.port ? Number(url.port) : 3306,
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, "") || undefined,
+    // MySQL 8 local installs often require public key retrieval when using
+    // the default caching_sha2_password authentication plugin.
+    allowPublicKeyRetrieval: allowPublicKeyRetrieval ? allowPublicKeyRetrieval === "true" : true,
+    ssl: ssl ? ssl !== "false" : false,
     ...(url.searchParams.get("connection_limit")
       ? { connectionLimit: Number(url.searchParams.get("connection_limit")) }
       : {}),
