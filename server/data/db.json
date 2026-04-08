@@ -72,66 +72,18 @@
     }
   ],
   "spaces": [
-    {
-      "code": "A-01",
-      "status": "available",
-      "type": "temporary"
-    },
-    {
-      "code": "A-02",
-      "status": "available",
-      "type": "temporary"
-    },
-    {
-      "code": "A-03",
-      "status": "occupied",
-      "type": "temporary"
-    },
-    {
-      "code": "A-04",
-      "status": "reserved",
-      "type": "vip"
-    },
-    {
-      "code": "B-01",
-      "status": "occupied",
-      "type": "temporary"
-    },
-    {
-      "code": "B-02",
-      "status": "available",
-      "type": "temporary"
-    },
-    {
-      "code": "B-03",
-      "status": "monthly",
-      "type": "fixed"
-    },
-    {
-      "code": "B-04",
-      "status": "available",
-      "type": "temporary"
-    },
-    {
-      "code": "C-01",
-      "status": "monthly",
-      "type": "fixed"
-    },
-    {
-      "code": "C-02",
-      "status": "occupied",
-      "type": "temporary"
-    },
-    {
-      "code": "C-03",
-      "status": "available",
-      "type": "temporary"
-    },
-    {
-      "code": "C-04",
-      "status": "reserved",
-      "type": "vip"
-    }
+    { "code": "A-01", "status": "available", "type": "temporary" },
+    { "code": "A-02", "status": "available", "type": "temporary" },
+    { "code": "A-03", "status": "occupied", "type": "temporary" },
+    { "code": "A-04", "status": "reserved", "type": "vip" },
+    { "code": "B-01", "status": "occupied", "type": "temporary" },
+    { "code": "B-02", "status": "available", "type": "temporary" },
+    { "code": "B-03", "status": "monthly", "type": "fixed" },
+    { "code": "B-04", "status": "available", "type": "temporary" },
+    { "code": "C-01", "status": "monthly", "type": "fixed" },
+    { "code": "C-02", "status": "occupied", "type": "temporary" },
+    { "code": "C-03", "status": "available", "type": "temporary" },
+    { "code": "C-04", "status": "reserved", "type": "vip" }
   ],
   "vehicleProfiles": {
     "粤AA839Q": {
@@ -141,7 +93,7 @@
     },
     "粤BF6688": {
       "listType": "blacklist",
-      "owner": "欠费用户",
+      "owner": "欠费车主",
       "vehicleType": "temporary",
       "reason": "历史欠费未处理"
     },
@@ -163,12 +115,18 @@
       "type": "minutes",
       "value": 120,
       "name": "两小时免停券"
+    },
+    {
+      "code": "WEEKEND-10",
+      "type": "amount",
+      "value": 10,
+      "name": "周末停车减免券"
     }
   ],
   "entries": [
     {
       "id": "entry-seed-1",
-      "plateNumber": "粤D12345",
+      "plateNumber": "粤B 12345",
       "plateType": "temporary",
       "entryTime": "2026-04-06T07:30:00.000Z",
       "exitTime": "2026-04-06T09:05:00.000Z",
@@ -184,7 +142,7 @@
     },
     {
       "id": "entry-seed-2",
-      "plateNumber": "粤C88888",
+      "plateNumber": "粤C 88888",
       "plateType": "temporary",
       "entryTime": "2026-04-06T10:10:00.000Z",
       "exitTime": "2026-04-06T11:45:00.000Z",
@@ -206,31 +164,13 @@
       "gateIn": "gate-east-in",
       "spaceCode": "B-03",
       "status": "active"
-    },
-    {
-      "id": "entry-live-2",
-      "plateNumber": "粤A 66666",
-      "plateType": "temporary",
-      "entryTime": "2026-04-06T11:27:44.887Z",
-      "gateIn": "gate-east-in",
-      "spaceCode": "A-01",
-      "status": "closed",
-      "exitTime": "2026-04-06T11:27:44.922Z",
-      "gateOut": "gate-east-out",
-      "billing": {
-        "durationMinutes": 1,
-        "rawAmount": 0,
-        "discountAmount": 20,
-        "finalAmount": 0,
-        "exitTime": "2026-04-06T11:27:44.922Z"
-      }
     }
   ],
   "payments": [
     {
       "id": "pay-seed-1",
       "entryId": "entry-seed-1",
-      "plateNumber": "粤D12345",
+      "plateNumber": "粤B 12345",
       "amount": 12,
       "discountAmount": 0,
       "channel": "扫码支付",
@@ -239,20 +179,11 @@
     {
       "id": "pay-seed-2",
       "entryId": "entry-seed-2",
-      "plateNumber": "粤C88888",
+      "plateNumber": "粤C 88888",
       "amount": 36,
       "discountAmount": 20,
       "channel": "无感支付",
       "createdAt": "2026-04-06T11:45:00.000Z"
-    },
-    {
-      "id": "pay-seed-3",
-      "entryId": "entry-live-2",
-      "plateNumber": "粤A 66666",
-      "amount": 0,
-      "discountAmount": 20,
-      "channel": "扫码支付",
-      "createdAt": "2026-04-06T11:27:44.922Z"
     }
   ],
   "otp": {
@@ -262,8 +193,8 @@
   },
   "lastOcr": {
     "gateId": "gate-east-in",
-    "plateNumber": "粤Z 99001",
-    "normalizedPlate": "粤Z99001",
+    "plateNumber": "粤A 99001V",
+    "normalizedPlate": "粤A99001V",
     "confidence": 98,
     "provider": "Local OCR Adapter",
     "listType": "unknown",
@@ -275,36 +206,30 @@
       "summary": [
         {
           "label": "可用优惠券",
-          "value": "4 张",
-          "hint": "商场券与停车减免券自动叠加"
+          "value": "3 张",
+          "hint": "商场发券与停车减免券会自动同步到账户。"
         },
         {
           "label": "本月停车次数",
-          "value": "18 次",
-          "hint": "较上月提升 4 次"
+          "value": "4 次",
+          "hint": "根据历史订单与当前在场记录自动统计。"
         },
         {
-          "label": "待开发票",
-          "value": "2 笔",
-          "hint": "支持在线申请电子发票"
+          "label": "待开电子发票",
+          "value": "1 笔",
+          "hint": "提交申请后可在停车订单中追踪处理进度。"
         }
       ],
       "activeParking": {
         "plateNumber": "粤A A839Q",
         "lotName": "星港商业中心停车场",
         "spaceCode": "B-03",
-        "entryLabel": "今天 02:12 入场",
-        "durationLabel": "已停车 5 小时 18 分",
+        "entryLabel": "今天 09:12 入场",
+        "durationLabel": "已停 5 小时 04 分",
         "currentAmount": 20,
         "billingStatus": "待缴费后离场"
       },
       "reservations": [
-        {
-          "id": "reserve-1775486365219-zfh094",
-          "site": "星港商业中心 B1 层 08 号位",
-          "time": "今天 20:00 - 23:00",
-          "status": "已确认"
-        },
         {
           "id": "reserve-demo-1",
           "site": "星港商业中心 B1 层 09 号位",
@@ -312,13 +237,13 @@
           "status": "已确认"
         },
         {
-          "id": "reserve-1",
+          "id": "reserve-demo-2",
           "site": "星港商业中心 B1 层 06 号位",
           "time": "今天 18:30 - 22:00",
           "status": "已确认"
         },
         {
-          "id": "reserve-2",
+          "id": "reserve-demo-3",
           "site": "星港写字楼 VIP 区 02 号位",
           "time": "2026-04-08 09:00 - 18:00",
           "status": "待使用"
@@ -336,11 +261,6 @@
           "validUntil": "有效期至 2026-05-12"
         },
         {
-          "code": "VIP-NIGHT",
-          "title": "夜间停车 8 折",
-          "validUntil": "有效期至 2026-04-20"
-        },
-        {
           "code": "WEEKEND-10",
           "title": "周末停车减 10 元",
           "validUntil": "有效期至 2026-05-05"
@@ -348,20 +268,13 @@
       ],
       "orders": [
         {
-          "id": "order-0",
-          "plateNumber": "粤A A839Q",
-          "site": "星港商业中心停车场",
-          "duration": "5 小时 4 分",
-          "amount": 20,
-          "channel": "扫码支付"
-        },
-        {
           "id": "order-1",
           "plateNumber": "粤A A839Q",
           "site": "星港商业中心停车场",
           "duration": "2 小时 05 分",
           "amount": 12,
-          "channel": "扫码支付"
+          "channel": "扫码支付",
+          "invoiceStatus": "未申请"
         },
         {
           "id": "order-2",
@@ -369,7 +282,10 @@
           "site": "星港写字楼停车场",
           "duration": "6 小时 20 分",
           "amount": 36,
-          "channel": "无感支付"
+          "channel": "无感支付",
+          "invoiceStatus": "已开票",
+          "invoiceTitle": "陈先生停车服务费",
+          "invoiceEmail": "user@parksphere.local"
         },
         {
           "id": "order-3",
@@ -377,50 +293,59 @@
           "site": "城市会展停车场",
           "duration": "1 小时 10 分",
           "amount": 0,
-          "channel": "优惠券抵扣"
+          "channel": "优惠券抵扣",
+          "invoiceStatus": "申请中",
+          "invoiceTitle": "陈先生停车服务费",
+          "invoiceEmail": "user@parksphere.local"
         }
       ],
       "membership": {
         "plan": "月租通勤卡",
         "expiresAt": "2026-05-31",
-        "spaceCode": "B-03"
+        "spaceCode": "B-03",
+        "monthlyRate": 680,
+        "renewalHistory": [
+          {
+            "id": "renew-seed-1",
+            "months": 3,
+            "amount": 2040,
+            "paymentChannel": "扫码支付",
+            "status": "已生效",
+            "createdAt": "2026-03-01T10:00:00.000Z",
+            "expiresAt": "2026-05-31"
+          }
+        ]
       },
       "notices": [
         {
-          "id": "notice-demo-1",
+          "id": "notice-1",
           "title": "待离场缴费",
           "message": "你的车辆当前停放在 B-03，请完成缴费后离场。",
-          "time": "刚刚"
-        },
-        {
-          "id": "notice-1775486365219-cbpctx",
-          "title": "预约成功",
-          "message": "星港商业中心 B1 层 08 号位 已为你锁定，请在预约时段内到场。",
-          "time": "刚刚"
-        },
-        {
-          "id": "notice-demo-2",
-          "title": "预约成功",
-          "message": "星港商业中心 B1 层 09 号位 已为你锁定，请在预约时段内到场。",
-          "time": "刚刚"
-        },
-        {
-          "id": "notice-1",
-          "title": "月租即将到期",
-          "message": "你的月租套餐将于 2026-05-31 到期，可提前续费保留车位。",
-          "time": "刚刚"
+          "time": "刚刚",
+          "type": "billing"
         },
         {
           "id": "notice-2",
           "title": "预约成功",
-          "message": "今晚 18:30 的 B1 预约车位已锁定，请按时进场。",
-          "time": "10 分钟前"
+          "message": "今晚 21:00 的 B1 预约车位已为你锁定，请按时到场。",
+          "time": "10 分钟前",
+          "type": "reservation"
         },
         {
           "id": "notice-3",
-          "title": "电子发票可开具",
-          "message": "你有 2 笔停车订单支持在线开票。",
-          "time": "今天"
+          "title": "电子发票处理中",
+          "message": "你有 1 笔停车订单正在开票，完成后将发送至登记邮箱。",
+          "time": "今天",
+          "type": "invoice",
+          "status": "申请中"
+        },
+        {
+          "id": "ticket-seed-1",
+          "title": "工单已创建：无法自动抬杆",
+          "message": "东门出口识别成功但未自动起杆，客服将通过 13700137000 与你联系。",
+          "time": "昨天",
+          "type": "support",
+          "status": "处理中"
         }
       ]
     }

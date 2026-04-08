@@ -12,3 +12,7 @@ frontend-out.log
 frontend-err.log
 logs/
 .mysql-dev/
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+release/

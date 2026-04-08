@@ -1,6 +1,6 @@
 # 停车场管理系统
 
-一个基于 Vue 3 与 Express 的多角色停车场管理系统演示项目，覆盖管理员、商户端与车主端三类使用场景。项目内置认证门户、运营看板、出入管理、计费规则、车位管理、财务审计与车主服务中心，适合用于后台原型展示、课程作业、毕业设计和中小型系统演示。
+一个基于 Vue 3、Vite、Express 和 Prisma 构建的多角色停车场管理系统，覆盖管理端、商户端和车主端三类场景。项目支持登录认证、实时看板、出入管理、计费引擎、车位管理、财务审计，以及车主预约、离场缴费、电子发票和月租续费等流程。
 
 ## 项目预览
 
@@ -10,27 +10,27 @@
 ### 商户端
 ![商户端控制台](./docs/images/merchant-console.png)
 
-### 车主端
-![车主服务中心](./docs/images/user-portal.png)
+### 用户端
+![用户端服务中心](./docs/images/user-portal.png)
 
 ## 核心能力
 
-- 多角色登录体验：支持管理员、商户端、车主端进入各自界面
-- 安全认证门户：账号密码登录、短信验证码登录、滑块验证、注册审核流程
-- 实时运营看板：车位总量、剩余车位、设备状态、分区占用、告警提示
-- 出入管理：OCR 识别模拟、白名单放行、黑名单拦截、入场建单、出场结算
-- 计费引擎：免费时长、按时计费、阶梯计费、封顶金额、优惠券抵扣
-- 车位管理：车位状态地图、预留、占用、释放、月租位切换
-- 财务审计：收入汇总、订单流水、趋势报表
-- 车主服务中心：预约车位、停车订单、优惠券、月租服务、离场缴费
+- 多角色认证：管理员、商户端、车主端三种账号可进入各自界面
+- 安全门户：账号密码登录、手机验证码登录、滑块验证、找回密码、审批式注册
+- 运营看板：总车位、剩余车位、设备在线状态、异常告警、营收与趋势分析
+- 出入控制：OCR 识别、白名单自动放行、黑名单拦截、入场建单、出场结算
+- 计费引擎：免费时长、按时计费、分段计费、封顶金额、优惠券抵扣
+- 车位管理：车位状态地图、占用/释放、预约位、月租位切换
+- 财务审计：营收汇总、订单流水、优惠抵扣、趋势看板
+- 车主服务：预约车位、离场缴费、客服工单、电子发票申请、月租续费
 
 ## 技术栈
 
 - 前端：Vue 3、Vite
 - 后端：Express 5
 - 认证：JWT、bcryptjs
-- ORM / 数据访问：Prisma 7、`@prisma/adapter-mariadb`
-- 数据存储：MySQL 8（支持保留 JSON 演示模式作为本地降级方案）
+- 数据层：Prisma 7、MariaDB Adapter、SQLite 单机模式
+- 存储模式：MySQL / SQLite / JSON 回退模式
 
 ## 目录结构
 
@@ -48,21 +48,23 @@ parking-management-system/
 │  └─ index.js
 ├─ src/
 │  ├─ assets/
+│  ├─ constants/
 │  ├─ App.vue
 │  └─ api.js
+├─ deploy/
+├─ scripts/
 ├─ .env.example
 ├─ LICENSE
 ├─ package.json
-├─ prisma.config.ts
-└─ README.md
+└─ prisma.config.ts
 ```
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js 20 及以上
-- npm 10 及以上
+- Node.js 20 或更高版本
+- npm 10 或更高版本
 
 ### 安装依赖
 
@@ -70,21 +72,25 @@ parking-management-system/
 npm install
 ```
 
-### 配置数据库
+### 配置环境变量
 
-如需启用 MySQL + Prisma，请先复制环境变量模板并填写你的数据库账号密码：
+复制环境变量模板：
 
 ```bash
 copy .env.example .env
 ```
 
-推荐数据库连接串示例：
+### 启动 MySQL 模式
+
+在 `.env` 中配置数据库连接，例如：
 
 ```env
 DATABASE_URL="mysql://root:your_password@127.0.0.1:3306/parking_management_system"
+JWT_SECRET="parksphere-dev-secret"
+PORT=5050
 ```
 
-首次接入 MySQL 时，执行以下命令初始化表结构并导入演示数据：
+首次接入 MySQL 时执行：
 
 ```bash
 npm run prisma:generate
@@ -92,27 +98,35 @@ npm run prisma:push
 npm run db:seed
 ```
 
-### 启动后端
+启动后端：
 
 ```bash
 node server/index.js
 ```
 
-默认地址为 [http://localhost:5050](http://localhost:5050)。
-
-### 启动前端
+启动前端：
 
 ```bash
 npm run dev
 ```
 
-默认地址为 [http://localhost:5173](http://localhost:5173)。
+默认访问地址：
 
-### 生产构建
+- 前端：[http://localhost:5173](http://localhost:5173)
+- 后端：[http://localhost:5050](http://localhost:5050)
+
+### 启动 SQLite 单机模式
+
+适合演示、交付和纯净电脑部署：
 
 ```bash
-npm run build
+npm run db:sqlite:init
+npm run start:sqlite
 ```
+
+SQLite 数据库文件默认位于：
+
+`server/data/parking.db`
 
 ## 演示账号
 
@@ -120,38 +134,13 @@ npm run build
 | --- | --- | --- |
 | 管理员 | `admin@parksphere.local` | `Admin@123` |
 | 商户端 | `merchant@parksphere.local` | `Merchant@123` |
-| 车主端 | `user@parksphere.local` | `User@123` |
+| 用户端 | `user@parksphere.local` | `User@123` |
 
-短信验证码测试号码：
+测试验证码：
 
-- `13800138000`：`246810`
-- `13900139000`：`135790`
-- `13700137000`：`864209`
-
-## 功能模块
-
-### 1. 认证与安全门户
-
-- 账号密码登录
-- 手机验证码快捷登录
-- 记住我、忘记密码、注册审核流程
-- 滑块验证交互演示
-
-### 2. 管理端与商户端控制台
-
-- 指挥中心总览
-- 出入管理与 OCR 识别
-- 计费规则配置
-- 车位状态操作
-- 财务统计与报表概览
-
-### 3. 车主端服务中心
-
-- 当前停车状态
-- 预约车位提交与记录查看
-- 离场缴费
-- 优惠券与服务提醒
-- 月租服务信息
+- `13800138000` → `246810`
+- `13900139000` → `135790`
+- `13700137000` → `864209`
 
 ## 主要接口
 
@@ -159,6 +148,7 @@ npm run build
 | --- | --- | --- |
 | POST | `/api/auth/login` | 密码或验证码登录 |
 | POST | `/api/auth/send-otp` | 获取演示验证码 |
+| POST | `/api/auth/reset-password` | 重置密码 |
 | POST | `/api/auth/register` | 提交注册审核 |
 | GET | `/api/dashboard` | 获取当前角色首页数据 |
 | POST | `/api/ocr/recognize` | 模拟车牌识别 |
@@ -166,17 +156,18 @@ npm run build
 | POST | `/api/exits` | 创建出场结算 |
 | PUT | `/api/billing/config` | 更新计费配置 |
 | PUT | `/api/spaces/:code` | 更新车位状态 |
-| POST | `/api/user/reservations` | 车主端提交预约 |
-| POST | `/api/user/checkout` | 车主端离场缴费 |
+| POST | `/api/user/reservations` | 用户端提交预约 |
+| POST | `/api/user/checkout` | 用户端离场缴费 |
+| POST | `/api/user/support-tickets` | 用户端提交客服工单 |
+| POST | `/api/user/invoices` | 用户端申请电子发票 |
+| POST | `/api/user/membership/renewals` | 用户端月租续费 |
 
 ## 开发说明
 
-- 当前仓库支持两种数据模式：
-- 未设置 `DATABASE_URL` 时，后端继续使用 `server/data/db.json`，适合演示与本地联调。
-- 设置 `DATABASE_URL` 后，后端会切换到 MySQL + Prisma 存储层。
-- `prisma/seed.js` 会把当前演示数据导入 MySQL，便于快速得到可登录、可预约、可缴费的初始化环境。
-- 如需生产化部署，建议进一步接入真实 OCR 服务、对象存储、支付网关与更细粒度的权限体系。
-- 认证密钥、数据库账号、第三方服务地址等敏感配置应统一放入环境变量。
+- 未配置 `DATABASE_URL` 时，可使用 JSON 或 SQLite 模式快速启动
+- 配置 `DATABASE_URL` 后，可切换到 MySQL + Prisma 持久化模式
+- `prisma/seed.js` 会将当前演示数据导入 MySQL，便于快速得到可登录、可预约、可缴费的初始环境
+- 交付到纯净 Windows 电脑时，推荐使用 `release/portable` 中的单机版
 
 ## License
 

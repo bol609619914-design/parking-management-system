@@ -5,9 +5,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isDatabaseEnabled, readDb, writeDb, nextId } from "./lib/store.js";
+import { ensureStorageReady, getStorageMeta, readDb, writeDb, nextId } from "./lib/store.js";
 import { calculateBill, buildFinance, buildReports } from "./lib/billing.js";
 import { recognizeVehicle } from "./lib/ocr.js";
+import { badRequest, conflict, forbidden, jsonErrorHandler, notFound, unauthorized, assert, asTrimmedText } from "./lib/http.js";
+import { createPortalNotice, normalizeUserPortal } from "./lib/userPortal.js";
 
 const app = express();
 const port = process.env.PORT || 5050;
@@ -26,14 +28,14 @@ function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) {
-    return res.status(401).json({ message: "缺少登录令牌" });
+    return next(unauthorized("缺少登录令牌"));
   }
 
   try {
     req.user = jwt.verify(token, jwtSecret);
     next();
   } catch {
-    res.status(401).json({ message: "登录状态已失效，请重新登录" });
+    next(unauthorized("登录状态已失效，请重新登录"));
   }
 }
 
@@ -47,10 +49,11 @@ function buildOverview(spaces) {
 }
 
 function buildUserPortal(db, user) {
+  const portal = normalizeUserPortal(db.userPortals[user.sub] || null);
   return {
     viewType: "user",
     alerts: db.alerts.slice(0, 2),
-    userPortal: db.userPortals[user.sub] || null,
+    userPortal: portal,
   };
 }
 
@@ -76,6 +79,18 @@ function requireAdminRole(req, res) {
     return false;
   }
   return true;
+}
+
+function prependNotice(portal, notice) {
+  portal.notices = [notice, ...(portal.notices || [])].slice(0, 12);
+}
+
+function ensurePortal(db, userId) {
+  const portal = db.userPortals[userId];
+  assert(portal, notFound("未找到用户端服务数据"));
+  const normalized = normalizeUserPortal(portal);
+  db.userPortals[userId] = normalized;
+  return normalized;
 }
 
 function formatDurationLabel(durationMinutes) {
@@ -153,43 +168,34 @@ function updateSpaceState(space, action) {
 }
 
 app.get("/api/health", (_req, res) => {
+  const storage = getStorageMeta();
   res.json({
     ok: true,
     now: new Date().toISOString(),
-    storage: isDatabaseEnabled() ? "mysql" : "json",
+    storage: storage.mode,
+    ...(storage.path ? { storagePath: storage.path } : {}),
   });
 });
 
 app.post("/api/auth/send-otp", async (req, res) => {
   const db = await readDb();
-  const phone = req.body?.phone;
-  if (!phone) {
-    return res.status(400).json({ message: "请输入手机号" });
-  }
+  const phone = asTrimmedText(req.body?.phone);
+  assert(phone, badRequest("请输入手机号"));
   const code = db.otp[phone] || "246810";
   res.json({ phone, code, expiresIn: 300 });
 });
 
 app.post("/api/auth/reset-password", async (req, res) => {
   const db = await readDb();
-  const { phone, otp, newPassword } = req.body || {};
+  const phone = asTrimmedText(req.body?.phone);
+  const otp = asTrimmedText(req.body?.otp);
+  const newPassword = asTrimmedText(req.body?.newPassword);
   const user = db.users.find((item) => item.phone === phone);
 
-  if (!phone || !otp || !newPassword) {
-    return res.status(400).json({ message: "请完整填写手机号、验证码和新密码" });
-  }
-
-  if (!user) {
-    return res.status(404).json({ message: "未找到对应账号" });
-  }
-
-  if (db.otp[phone] !== otp) {
-    return res.status(401).json({ message: "短信验证码错误" });
-  }
-
-  if (String(newPassword).length < 6) {
-    return res.status(400).json({ message: "新密码至少需要 6 位" });
-  }
+  assert(phone && otp && newPassword, badRequest("请完整填写手机号、验证码和新密码"));
+  assert(user, notFound("未找到对应账号"));
+  assert(db.otp[phone] === otp, unauthorized("短信验证码错误"));
+  assert(String(newPassword).length >= 6, badRequest("新密码至少需要 6 位"));
 
   user.passwordHash = bcrypt.hashSync(newPassword, 10);
   await writeDb(db);
@@ -202,17 +208,15 @@ app.post("/api/auth/login", async (req, res) => {
 
   let user = null;
   if (mode === "password") {
-    user = db.users.find((item) => item.email === identifier || item.phone === identifier);
-    if (!user || !bcrypt.compareSync(password || "", user.passwordHash)) {
-      return res.status(401).json({ message: "账号或密码错误" });
-    }
+    const normalizedIdentifier = asTrimmedText(identifier);
+    user = db.users.find((item) => item.email === normalizedIdentifier || item.phone === normalizedIdentifier);
+    assert(user && bcrypt.compareSync(password || "", user.passwordHash), unauthorized("账号或密码错误"));
   } else if (mode === "otp") {
-    user = db.users.find((item) => item.phone === phone);
-    if (!user || db.otp[phone] !== otp) {
-      return res.status(401).json({ message: "短信验证码错误" });
-    }
+    const normalizedPhone = asTrimmedText(phone);
+    user = db.users.find((item) => item.phone === normalizedPhone);
+    assert(user && db.otp[normalizedPhone] === asTrimmedText(otp), unauthorized("短信验证码错误"));
   } else {
-    return res.status(400).json({ message: "不支持的登录方式" });
+    throw badRequest("不支持的登录方式");
   }
 
   res.json({
@@ -229,10 +233,14 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.post("/api/auth/register", async (req, res) => {
   const db = await readDb();
-  const { applicant, email, role, siteName, siteCode, agreement } = req.body || {};
-  if (!agreement) {
-    return res.status(400).json({ message: "请先勾选服务协议" });
-  }
+  const { role, agreement } = req.body || {};
+  const applicant = asTrimmedText(req.body?.applicant);
+  const email = asTrimmedText(req.body?.email);
+  const siteName = asTrimmedText(req.body?.siteName);
+  const siteCode = asTrimmedText(req.body?.siteCode);
+  assert(agreement, badRequest("请先勾选服务协议"));
+  assert(applicant && email && siteName && siteCode, badRequest("请完整填写注册资料"));
+  assert(["merchant", "admin"].includes(role), badRequest("注册角色仅支持商户端或管理端"));
 
   const applicationId = nextId("apply");
   db.applications.push({
@@ -269,14 +277,12 @@ app.put("/api/spaces/:code", authMiddleware, async (req, res) => {
 
   const db = await readDb();
   const space = db.spaces.find((item) => item.code === req.params.code);
-  if (!space) {
-    return res.status(404).json({ message: "\u672a\u627e\u5230\u5bf9\u5e94\u8f66\u4f4d" });
-  }
+  assert(space, notFound("未找到对应车位"));
 
   try {
     updateSpaceState(space, (req.body || {}).action);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    throw badRequest(error.message);
   }
 
   await writeDb(db);
@@ -291,26 +297,29 @@ app.post("/api/user/reservations", authMiddleware, async (req, res) => {
   if (!requireUserRole(req, res)) return;
 
   const db = await readDb();
-  const portal = db.userPortals[req.user.sub];
+  const portal = ensurePortal(db, req.user.sub);
   const body = req.body || {};
-  if (!portal) {
-    return res.status(404).json({ message: "未找到用户端服务数据" });
-  }
+  const site = asTrimmedText(body.site);
+  const time = asTrimmedText(body.time);
+  assert(site && time, badRequest("请填写预约车位和预约时段"));
 
   const reservation = {
     id: nextId("reserve"),
-    site: body.site || "星港商业中心 B1 层 08 号位",
-    time: body.time || "今天 20:00 - 23:00",
+    site,
+    time,
     status: "已确认",
   };
 
   portal.reservations.unshift(reservation);
-  portal.notices.unshift({
-    id: nextId("notice"),
-    title: "预约成功",
-    message: `${reservation.site} 已为你锁定，请在预约时段内到场。`,
-    time: "刚刚",
-  });
+  prependNotice(
+    portal,
+    createPortalNotice({
+      id: nextId("notice"),
+      title: "预约成功",
+      message: `${reservation.site} 已为你锁定，请在预约时段内到场。`,
+    }),
+  );
+  portal.summary = normalizeUserPortal(portal).summary;
 
   await writeDb(db);
   res.json({ reservation, userPortal: portal });
@@ -320,16 +329,16 @@ app.post("/api/user/checkout", authMiddleware, async (req, res) => {
   if (!requireUserRole(req, res)) return;
 
   const db = await readDb();
-  const portal = db.userPortals[req.user.sub];
+  const portal = ensurePortal(db, req.user.sub);
   const body = req.body || {};
-  if (!portal) {
-    return res.status(404).json({ message: "未找到用户端服务数据" });
-  }
 
   const activeParking = portal.activeParking;
-  if (!activeParking || activeParking.billingStatus === "已完成支付，可离场" || activeParking.billingStatus === "当前无在场车辆") {
-    return res.status(400).json({ message: "当前没有可结算的停车记录" });
-  }
+  assert(
+    activeParking &&
+      activeParking.billingStatus !== "已完成支付，可离场" &&
+      activeParking.billingStatus !== "当前无在场车辆",
+    badRequest("当前没有可结算的停车记录"),
+  );
 
   const entry = db.entries.find(
     (item) =>
@@ -338,9 +347,7 @@ app.post("/api/user/checkout", authMiddleware, async (req, res) => {
       item.spaceCode === activeParking.spaceCode,
   );
 
-  if (!entry) {
-    return res.status(404).json({ message: "未找到当前在场车辆记录" });
-  }
+  assert(entry, notFound("未找到当前在场车辆记录"));
 
   const coupon = findCoupon(db, body.couponCode);
   const bill = calculateBill({ entry, pricing: db.pricing, coupon });
@@ -369,13 +376,18 @@ app.post("/api/user/checkout", authMiddleware, async (req, res) => {
     duration: formatDurationLabel(bill.durationMinutes),
     amount: bill.finalAmount,
     channel: payment.channel,
+    invoiceStatus: "未申请",
   });
-  portal.notices.unshift({
-    id: nextId("notice"),
-    title: "离场缴费完成",
-    message: `${entry.plateNumber} 已完成支付，可直接离场。`,
-    time: "刚刚",
-  });
+  prependNotice(
+    portal,
+    createPortalNotice({
+      id: nextId("notice"),
+      title: "离场缴费完成",
+      message: `${entry.plateNumber} 已完成支付，可直接离场。`,
+      type: "billing",
+      status: "success",
+    }),
+  );
   portal.activeParking = {
     plateNumber: entry.plateNumber,
     lotName: activeParking.lotName,
@@ -385,9 +397,118 @@ app.post("/api/user/checkout", authMiddleware, async (req, res) => {
     currentAmount: 0,
     billingStatus: "已完成支付，可离场",
   };
+  portal.summary = normalizeUserPortal(portal).summary;
 
   await writeDb(db);
   res.json({ bill, payment, userPortal: portal });
+});
+
+app.post("/api/user/support-tickets", authMiddleware, async (req, res) => {
+  if (!requireUserRole(req, res)) return;
+
+  const db = await readDb();
+  const portal = ensurePortal(db, req.user.sub);
+  const topic = asTrimmedText(req.body?.topic);
+  const content = asTrimmedText(req.body?.content);
+  const contact = asTrimmedText(req.body?.contact);
+
+  assert(topic && content && contact, badRequest("请完整填写工单主题、联系方式和问题描述"));
+
+  const ticket = createPortalNotice({
+    id: nextId("ticket"),
+    title: `工单已创建：${topic}`,
+    message: `${content}。客服将通过 ${contact} 与你联系。`,
+    type: "support",
+    status: "处理中",
+  });
+
+  prependNotice(portal, ticket);
+  await writeDb(db);
+  res.json({ ticket, userPortal: portal });
+});
+
+app.post("/api/user/invoices", authMiddleware, async (req, res) => {
+  if (!requireUserRole(req, res)) return;
+
+  const db = await readDb();
+  const portal = ensurePortal(db, req.user.sub);
+  const orderId = asTrimmedText(req.body?.orderId);
+  const invoiceTitle = asTrimmedText(req.body?.invoiceTitle);
+  const invoiceEmail = asTrimmedText(req.body?.invoiceEmail);
+
+  assert(invoiceTitle && invoiceEmail, badRequest("请填写发票抬头和接收邮箱"));
+
+  const order = portal.orders.find((item) => item.id === orderId) || portal.orders[0];
+  assert(order, notFound("暂无可申请发票的停车订单"));
+  assert(order.invoiceStatus !== "已开票", conflict("该订单已完成开票，无需重复申请"));
+
+  order.invoiceStatus = "申请中";
+  order.invoiceTitle = invoiceTitle;
+  order.invoiceEmail = invoiceEmail;
+  order.invoiceRequestedAt = new Date().toISOString();
+
+  prependNotice(
+    portal,
+    createPortalNotice({
+      id: nextId("notice"),
+      title: "电子发票申请已提交",
+      message: `${order.plateNumber} 的停车订单已进入开票队列，结果将发送到 ${invoiceEmail}。`,
+      type: "invoice",
+      status: "申请中",
+    }),
+  );
+  portal.summary = normalizeUserPortal(portal).summary;
+
+  await writeDb(db);
+  res.json({ order, userPortal: portal });
+});
+
+app.post("/api/user/membership/renewals", authMiddleware, async (req, res) => {
+  if (!requireUserRole(req, res)) return;
+
+  const db = await readDb();
+  const portal = ensurePortal(db, req.user.sub);
+  const months = Number(req.body?.months);
+  const paymentChannel = asTrimmedText(req.body?.paymentChannel) || "扫码支付";
+  const couponCode = asTrimmedText(req.body?.couponCode);
+
+  assert(Number.isInteger(months) && months > 0 && months <= 12, badRequest("续费月数仅支持 1 到 12 个月"));
+
+  const unitPrice = Number(portal.membership.monthlyRate || 680);
+  const coupon = couponCode ? findCoupon(db, couponCode) : null;
+  const discountAmount = coupon?.type === "amount" ? Number(coupon.value) : 0;
+  const amount = Math.max(0, unitPrice * months - discountAmount);
+  const expiresBase = new Date(portal.membership.expiresAt || new Date());
+  const nextExpiry = new Date(expiresBase);
+  nextExpiry.setMonth(nextExpiry.getMonth() + months);
+
+  const renewal = {
+    id: nextId("renew"),
+    months,
+    amount,
+    paymentChannel,
+    couponCode: couponCode || null,
+    status: "已生效",
+    createdAt: new Date().toISOString(),
+    expiresAt: nextExpiry.toISOString().slice(0, 10),
+  };
+
+  portal.membership.expiresAt = renewal.expiresAt;
+  portal.membership.monthlyRate = unitPrice;
+  portal.membership.renewalHistory = [renewal, ...(portal.membership.renewalHistory || [])].slice(0, 10);
+  prependNotice(
+    portal,
+    createPortalNotice({
+      id: nextId("notice"),
+      title: "月租续费成功",
+      message: `${months} 个月月租已续费成功，新的到期日为 ${renewal.expiresAt}。`,
+      type: "renewal",
+      status: "success",
+    }),
+  );
+
+  await writeDb(db);
+  res.json({ renewal, userPortal: portal });
 });
 
 app.post("/api/entries", authMiddleware, async (req, res) => {
@@ -400,19 +521,17 @@ app.post("/api/entries", authMiddleware, async (req, res) => {
 
   if (ocr.listType === "blacklist") {
     await writeDb(db);
-    return res.status(403).json({ message: ocr.gateActionMessage });
+    throw forbidden(ocr.gateActionMessage);
   }
 
   const existing = db.entries.find((entry) => entry.status === "active" && entry.plateNumber.replace(/\s+/g, "") === ocr.plateNumber.replace(/\s+/g, ""));
   if (existing) {
     await writeDb(db);
-    return res.status(409).json({ message: "该车辆已在场内，无需重复入场" });
+    throw conflict("该车辆已在场内，无需重复入场");
   }
 
   const space = occupySpace(db, body.plateType || ocr.vehicleType);
-  if (!space) {
-    return res.status(400).json({ message: "当前停车场已无可用车位" });
-  }
+  assert(space, badRequest("当前停车场已无可用车位"));
 
   const entry = {
     id: nextId("entry"),
@@ -435,9 +554,7 @@ app.post("/api/exits", authMiddleware, async (req, res) => {
   const db = await readDb();
   const body = req.body || {};
   const entry = db.entries.find((item) => item.status === "active" && (item.id === body.entryId || item.plateNumber === body.plateNumber));
-  if (!entry) {
-    return res.status(404).json({ message: "未找到有效的在场车辆记录" });
-  }
+  assert(entry, notFound("未找到有效的在场车辆记录"));
 
   const coupon = findCoupon(db, body.couponCode);
   const bill = calculateBill({ entry, pricing: db.pricing, coupon });
@@ -468,6 +585,9 @@ app.put("/api/billing/config", authMiddleware, async (req, res) => {
 
   const db = await readDb();
   const body = req.body || {};
+  assert(Number(body.freeMinutes) >= 0, badRequest("免费时长不能小于 0"));
+  assert(Number(body.hourlyRate) >= 0 && Number(body.stepRate) >= 0, badRequest("计费金额不能小于 0"));
+  assert(Number(body.capAmount) >= 0, badRequest("封顶金额不能小于 0"));
   db.pricing = {
     ...db.pricing,
     freeMinutes: Number(body.freeMinutes),
@@ -481,10 +601,17 @@ app.put("/api/billing/config", authMiddleware, async (req, res) => {
   res.json(db.pricing);
 });
 
+app.use("/api", (_req, _res, next) => {
+  next(notFound("未找到对应 API 接口"));
+});
+
+app.use(jsonErrorHandler);
 app.use(express.static(distPath));
 app.get(/^(?!\/api).*/, (_req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
+
+await ensureStorageReady();
 
 app.listen(port, () => {
   console.log(`ParkSphere API running at http://localhost:${port}`);

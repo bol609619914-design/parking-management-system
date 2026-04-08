@@ -1,4 +1,14 @@
-﻿const API_BASE = "/api";
+const API_BASE = "/api";
+
+function withAuth(token, options = {}) {
+  return {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  };
+}
 
 async function request(path, options = {}) {
   const mergedHeaders = {
@@ -45,57 +55,66 @@ export const api = {
     });
   },
   getDashboard(token) {
-    return request("/dashboard", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    return request("/dashboard", withAuth(token));
   },
   recognizePlate(token, payload) {
-    return request("/ocr/recognize", {
+    return request("/ocr/recognize", withAuth(token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   createEntry(token, payload) {
-    return request("/entries", {
+    return request("/entries", withAuth(token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   createExit(token, payload) {
-    return request("/exits", {
+    return request("/exits", withAuth(token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   updatePricing(token, payload) {
-    return request("/billing/config", {
+    return request("/billing/config", withAuth(token, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   updateSpace(token, code, payload) {
-    return request(`/spaces/${code}`, {
+    return request(`/spaces/${code}`, withAuth(token, {
       method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   createUserReservation(token, payload) {
-    return request("/user/reservations", {
+    return request("/user/reservations", withAuth(token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
   },
   checkoutUserParking(token, payload) {
-    return request("/user/checkout", {
+    return request("/user/checkout", withAuth(token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
-    });
+    }));
+  },
+  createSupportTicket(token, payload) {
+    return request("/user/support-tickets", withAuth(token, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
+  },
+  requestInvoice(token, payload) {
+    return request("/user/invoices", withAuth(token, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
+  },
+  renewMembership(token, payload) {
+    return request("/user/membership/renewals", withAuth(token, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
   },
 };

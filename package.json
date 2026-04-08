@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "vite --configLoader native",
     "dev:api": "node server/index.js",
+    "dev:api:sqlite": "node scripts/start-sqlite.mjs",
     "build": "vite build --configLoader native",
+    "build:portable": "node scripts/build-portable.mjs",
     "preview": "vite preview --configLoader native",
     "start": "node server/index.js",
+    "start:sqlite": "node scripts/start-sqlite.mjs",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "db:sqlite:init": "node scripts/init-sqlite.mjs"
   },
   "keywords": [
     "parking",

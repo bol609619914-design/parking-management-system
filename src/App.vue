@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, reactive, ref } from "vue";
 import { api } from "./api";
+import { consoleMenus, getSpaceStatusLabel, getSpaceTypeLabel, portalMenus, roleLabels } from "./constants/ui";
 
 const loginMode = ref("password");
 const authScreen = ref("login");
@@ -13,21 +14,8 @@ const toast = reactive({ visible: false, title: "", message: "" });
 const auth = reactive({ token: "", user: null });
 const userDetail = reactive({ title: "", subtitle: "", items: [] });
 
-const menus = [
-  { key: "overview", label: "指挥中心", hint: "实时概览" },
-  { key: "access", label: "出入管理", hint: "识别与闸机" },
-  { key: "billing", label: "计费引擎", hint: "计费规则" },
-  { key: "spaces", label: "车位管理", hint: "地图与预约" },
-  { key: "finance", label: "财务审计", hint: "流水与报表" },
-];
-
-const userMenus = [
-  { key: "overview", label: "服务概览", hint: "当前停车与提醒" },
-  { key: "reservations", label: "预约车位", hint: "预约与到场信息" },
-  { key: "coupons", label: "优惠券", hint: "权益与抵扣" },
-  { key: "orders", label: "停车订单", hint: "账单与发票" },
-  { key: "membership", label: "月租服务", hint: "套餐与续费" },
-];
+const menus = consoleMenus;
+const userMenus = portalMenus;
 
 const loginForm = reactive({
   identifier: "",
@@ -46,12 +34,12 @@ const resetForm = reactive({
 });
 
 const registration = reactive({
-  applicant: "陈嘉怡",
-  email: "merchant@demo.com",
+  applicant: "",
+  email: "",
   role: "merchant",
-  siteName: "星港商业中心停车场",
-  siteCode: "XG-A2-008",
-  agreement: true,
+  siteName: "",
+  siteCode: "",
+  agreement: false,
 });
 
 const dashboard = reactive({
@@ -95,15 +83,31 @@ const pricingForm = reactive({
 
 const selectedSpaceCode = ref("A-01");
 const activeUserMenu = ref("overview");
-const userActionLoading = reactive({ reservation: false, checkout: false });
+const supportPanelOpen = ref(false);
+const userActionLoading = reactive({
+  reservation: false,
+  checkout: false,
+  support: false,
+  invoice: false,
+  renewal: false,
+});
+const supportForm = reactive({
+  topic: "停车异常",
+  contact: "",
+  content: "",
+});
+const invoiceForm = reactive({
+  orderId: "",
+  invoiceTitle: "",
+  invoiceEmail: "",
+});
+const renewalForm = reactive({
+  months: 1,
+  paymentChannel: "扫码支付",
+  couponCode: "",
+});
 
-const roleMap = {
-  admin: "管理端",
-  merchant: "商户端",
-  user: "用户端",
-};
-
-const roleLabel = computed(() => roleMap[auth.user?.role] || "未登录");
+const roleLabel = computed(() => roleLabels[auth.user?.role] || "未登录");
 const isUserPortal = computed(() => auth.user?.role === "user" || dashboard.viewType === "user");
 const canEditPricing = computed(() => auth.user?.role === "admin");
 const userSummaryCards = computed(() => dashboard.userPortal?.summary || []);
@@ -116,6 +120,10 @@ const currentReport = computed(() => dashboard.reports[0] || null);
 const currentMenu = computed(() => menus.find((item) => item.key === activeMenu.value));
 const currentUserMenu = computed(() => userMenus.find((item) => item.key === activeUserMenu.value));
 const selectedSpace = computed(() => dashboard.map.find((space) => space.code === selectedSpaceCode.value) || dashboard.map[0] || null);
+const supportTickets = computed(() => (dashboard.userPortal?.notices || []).filter((item) => item.type === "support"));
+const invoiceableOrders = computed(() => dashboard.userPortal?.orders || []);
+const selectedInvoiceOrder = computed(() => invoiceableOrders.value.find((item) => item.id === invoiceForm.orderId) || invoiceableOrders.value[0] || null);
+const latestRenewal = computed(() => dashboard.userPortal?.membership?.renewalHistory?.[0] || null);
 
 function notify(title, message) {
   toast.title = title;
@@ -124,6 +132,31 @@ function notify(title, message) {
   window.setTimeout(() => {
     toast.visible = false;
   }, 3200);
+}
+
+function hydrateUserForms() {
+  const portal = dashboard.userPortal;
+  if (!portal) return;
+
+  if (!supportForm.contact) {
+    supportForm.contact = auth.user?.phone || auth.user?.email || "";
+  }
+
+  if (!invoiceForm.invoiceEmail) {
+    invoiceForm.invoiceEmail = auth.user?.email || "";
+  }
+
+  if (!invoiceForm.invoiceTitle) {
+    invoiceForm.invoiceTitle = `${auth.user?.name || "车主"}停车服务费`;
+  }
+
+  if (!invoiceForm.orderId || !portal.orders?.some((order) => order.id === invoiceForm.orderId)) {
+    invoiceForm.orderId = portal.orders?.[0]?.id || "";
+  }
+
+  if (!renewalForm.couponCode) {
+    renewalForm.couponCode = portal.coupons?.[0]?.code || "";
+  }
 }
 
 function syncUserDetail(menuKey = activeUserMenu.value) {
@@ -218,7 +251,10 @@ async function loadDashboard() {
   if (Array.isArray(result.map) && (!selectedSpaceCode.value || !result.map.some((space) => space.code === selectedSpaceCode.value))) {
     selectedSpaceCode.value = result.map[0]?.code || "";
   }
-  if (result.userPortal) syncUserDetail();
+  if (result.userPortal) {
+    hydrateUserForms();
+    syncUserDetail();
+  }
 }
 
 async function handleLogin() {
@@ -336,16 +372,21 @@ async function handleSpaceAction(action) {
     dashboard.map = result.map;
     dashboard.overview = result.overview;
     selectedSpaceCode.value = result.space.code;
-    notify("车位状态已更新", result.space.code + " 已切换为 " + result.space.status);
+    notify("车位状态已更新", `${result.space.code} 已切换为 ${getSpaceStatusLabel(result.space.status)}`);
   } catch (error) {
     notify("车位操作失败", error.message);
   }
 }
+
 function openSupport() {
-  setUserDetail("客服支持", "ParkSphere 7 x 24 小时服务", [
-    { label: "服务热线", value: "400-880-9090" },
-    { label: "在线客服", value: "工作日 08:00 - 22:00" },
-    { label: "处理范围", value: "停车异常、缴费问题、月租续费、开票协助" },
+  supportPanelOpen.value = true;
+  if (!supportForm.contact) {
+    supportForm.contact = auth.user?.phone || auth.user?.email || "";
+  }
+  setUserDetail("客服工单", "支持 7 x 24 小时人工协助", [
+    { label: "当前主题", value: supportForm.topic },
+    { label: "联系方式", value: supportForm.contact || auth.user?.phone || auth.user?.email || "--" },
+    { label: "说明", value: "提交后会生成真实工单记录，并同步到服务提醒。" },
   ]);
 }
 
@@ -354,7 +395,8 @@ function openInvoiceGuide() {
   setUserDetail("电子发票", latestOrder?.plateNumber || "最近订单", [
     { label: "开票对象", value: latestOrder?.site || "停车订单" },
     { label: "最近金额", value: `¥ ${latestOrder?.amount ?? 0}` },
-    { label: "处理方式", value: "联系客服登记开票信息后发送至邮箱" },
+    { label: "开票状态", value: latestOrder?.invoiceStatus || "未申请" },
+    { label: "接收邮箱", value: latestOrder?.invoiceEmail || invoiceForm.invoiceEmail || "--" },
   ]);
 }
 
@@ -388,13 +430,17 @@ function openOrder(order) {
     { label: "停车时长", value: order.duration },
     { label: "实付金额", value: `¥ ${order.amount}` },
     { label: "支付方式", value: order.channel },
+    { label: "发票状态", value: order.invoiceStatus || "未申请" },
+    ...(order.invoiceTitle ? [{ label: "发票抬头", value: order.invoiceTitle }] : []),
+    ...(order.invoiceEmail ? [{ label: "接收邮箱", value: order.invoiceEmail }] : []),
   ]);
 }
 
 function openNotice(notice) {
-  setUserDetail("服务提醒", notice.title, [
+  setUserDetail(notice.type === "support" ? "客服工单" : "服务提醒", notice.title, [
     { label: "内容", value: notice.message },
     { label: "时间", value: notice.time },
+    ...(notice.status ? [{ label: "处理状态", value: notice.status }] : []),
   ]);
 }
 
@@ -403,6 +449,13 @@ function openMembership() {
   setUserDetail("月租服务", dashboard.userPortal.membership.plan, [
     { label: "到期日期", value: dashboard.userPortal.membership.expiresAt },
     { label: "绑定车位", value: dashboard.userPortal.membership.spaceCode },
+    { label: "月租单价", value: `¥ ${dashboard.userPortal.membership.monthlyRate || 680} / 月` },
+    ...(latestRenewal.value
+      ? [
+          { label: "最近续费", value: `${latestRenewal.value.months} 个月 · ¥ ${latestRenewal.value.amount}` },
+          { label: "续费结果", value: latestRenewal.value.status },
+        ]
+      : []),
   ]);
 }
 
@@ -442,6 +495,7 @@ async function handleCreateReservation() {
   try {
     const result = await api.createUserReservation(auth.token, reservationForm);
     dashboard.userPortal = result.userPortal;
+    hydrateUserForms();
     activeUserMenu.value = "reservations";
     openReservation(result.reservation);
     notify("预约成功", `${result.reservation.site} 已加入你的预约列表`);
@@ -461,6 +515,7 @@ async function handleUserCheckout() {
   try {
     const result = await api.checkoutUserParking(auth.token, checkoutForm);
     dashboard.userPortal = result.userPortal;
+    hydrateUserForms();
     activeUserMenu.value = "orders";
     setUserDetail("离场缴费完成", result.payment.plateNumber, [
       { label: "支付金额", value: `¥ ${result.bill.finalAmount}` },
@@ -476,10 +531,66 @@ async function handleUserCheckout() {
   }
 }
 
+async function handleCreateSupportTicket() {
+  userActionLoading.support = true;
+  try {
+    const result = await api.createSupportTicket(auth.token, supportForm);
+    dashboard.userPortal = result.userPortal;
+    hydrateUserForms();
+    supportPanelOpen.value = false;
+    openNotice(result.ticket);
+    notify("工单已创建", "客服请求已提交，处理进度会同步到服务提醒。");
+  } catch (error) {
+    notify("提交失败", error.message);
+  } finally {
+    userActionLoading.support = false;
+  }
+}
+
+async function handleRequestInvoice() {
+  userActionLoading.invoice = true;
+  try {
+    const result = await api.requestInvoice(auth.token, invoiceForm);
+    dashboard.userPortal = result.userPortal;
+    hydrateUserForms();
+    invoiceForm.orderId = result.order.id;
+    openOrder(result.order);
+    notify("发票申请已提交", `订单 ${result.order.id} 的电子发票正在处理。`);
+  } catch (error) {
+    notify("开票失败", error.message);
+  } finally {
+    userActionLoading.invoice = false;
+  }
+}
+
+async function handleRenewMembership() {
+  userActionLoading.renewal = true;
+  try {
+    const result = await api.renewMembership(auth.token, renewalForm);
+    dashboard.userPortal = result.userPortal;
+    hydrateUserForms();
+    openMembership();
+    notify("月租续费成功", `已续费 ${result.renewal.months} 个月，到期日更新为 ${result.renewal.expiresAt}。`);
+  } catch (error) {
+    notify("续费失败", error.message);
+  } finally {
+    userActionLoading.renewal = false;
+  }
+}
+
 function logout() {
   auth.token = "";
   auth.user = null;
   notificationsOpen.value = false;
+  supportPanelOpen.value = false;
+  supportForm.contact = "";
+  supportForm.content = "";
+  invoiceForm.orderId = "";
+  invoiceForm.invoiceEmail = "";
+  invoiceForm.invoiceTitle = "";
+  renewalForm.months = 1;
+  renewalForm.paymentChannel = "扫码支付";
+  renewalForm.couponCode = "";
   loginForm.sliderVerified = false;
   loginMode.value = "password";
   authScreen.value = "login";
@@ -489,7 +600,7 @@ function logout() {
 <template>
   <div v-if="!auth.token" class="auth-layout">
     <section class="auth-panel">
-      <p class="auth-kicker">&#20572;&#36710;&#22330;&#31649;&#29702;&#31995;&#32479;</p>
+      <p class="auth-kicker">停车场管理系统</p>
 
       <template v-if="authScreen === 'login'">
         <div class="card-tabs compact">
@@ -668,6 +779,44 @@ function logout() {
         <button class="secondary-button" @click="openSupport">联系客服</button>
       </header>
 
+      <section v-if="supportPanelOpen" class="support-panel">
+        <div class="module-header">
+          <div>
+            <p class="eyebrow">服务工单</p>
+            <h3>提交客服请求</h3>
+          </div>
+          <button class="link-button" @click="supportPanelOpen = false">收起</button>
+        </div>
+        <div class="support-layout">
+          <div class="support-form">
+            <label class="field">
+              <span class="field-icon">题</span>
+              <input v-model="supportForm.topic" type="text" placeholder="例如：车辆无法出场" />
+            </label>
+            <label class="field">
+              <span class="field-icon">联</span>
+              <input v-model="supportForm.contact" type="text" placeholder="手机号或邮箱" />
+            </label>
+            <label class="textarea-field">
+              <span class="field-icon">述</span>
+              <textarea v-model="supportForm.content" rows="4" placeholder="描述当前问题、位置和希望处理方式"></textarea>
+            </label>
+            <button class="primary-button" :disabled="userActionLoading.support" @click="handleCreateSupportTicket">
+              {{ userActionLoading.support ? "提交中..." : "提交工单" }}
+            </button>
+          </div>
+
+          <div class="support-ticket-list">
+            <article class="support-ticket" v-for="ticket in supportTickets.slice(0, 3)" :key="ticket.id" @click="openNotice(ticket)">
+              <strong>{{ ticket.title }}</strong>
+              <p>{{ ticket.message }}</p>
+              <span>{{ ticket.status || ticket.time }}</span>
+            </article>
+            <p v-if="!supportTickets.length" class="empty-hint">提交后会在这里保留最近的客服工单。</p>
+          </div>
+        </div>
+      </section>
+
       <template v-if="activeUserMenu === 'overview'">
         <section class="user-hero">
           <div class="user-hero-main">
@@ -817,12 +966,31 @@ function logout() {
       <template v-if="activeUserMenu === 'orders'">
         <section class="user-grid">
           <article class="module-card user-card span-2">
-            <div class="module-header"><div><p class="eyebrow">停车记录</p><h3>最近订单</h3></div><button class="link-button" @click="openInvoiceGuide">开票说明</button></div>
+            <div class="module-header"><div><p class="eyebrow">停车记录</p><h3>最近订单</h3></div><button class="link-button" @click="openInvoiceGuide">查看开票详情</button></div>
             <div class="user-form compact">
               <label class="field"><span class="field-icon">券</span><input v-model="checkoutForm.couponCode" type="text" placeholder="输入优惠券编码" /></label>
               <label class="field"><span class="field-icon">付</span><select v-model="checkoutForm.paymentChannel"><option value="扫码支付">扫码支付</option><option value="无感支付">无感支付</option></select></label>
               <button class="primary-button" :disabled="userActionLoading.checkout || !canCheckout" @click="handleUserCheckout">
                 {{ userActionLoading.checkout ? "结算中..." : canCheckout ? "结束停车并缴费" : "当前无待缴订单" }}
+              </button>
+            </div>
+            <div class="invoice-form-grid">
+              <label class="field">
+                <span class="field-icon">单</span>
+                <select v-model="invoiceForm.orderId">
+                  <option v-for="order in invoiceableOrders" :key="order.id" :value="order.id">{{ order.plateNumber }} · {{ order.site }}</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-icon">抬</span>
+                <input v-model="invoiceForm.invoiceTitle" type="text" placeholder="发票抬头" />
+              </label>
+              <label class="field">
+                <span class="field-icon">@</span>
+                <input v-model="invoiceForm.invoiceEmail" type="email" placeholder="接收邮箱" />
+              </label>
+              <button class="secondary-button" :disabled="userActionLoading.invoice || !invoiceableOrders.length || selectedInvoiceOrder?.invoiceStatus === '已开票'" @click="handleRequestInvoice">
+                {{ userActionLoading.invoice ? "申请中..." : selectedInvoiceOrder?.invoiceStatus === "已开票" ? "订单已开票" : "申请电子发票" }}
               </button>
             </div>
             <div class="order-table">
@@ -832,7 +1000,7 @@ function logout() {
                 <span>{{ order.site }}</span>
                 <span>{{ order.duration }}</span>
                 <span>¥ {{ order.amount }}</span>
-                <span>{{ order.channel }}</span>
+                <span>{{ order.invoiceStatus && order.invoiceStatus !== "未申请" ? `${order.channel} · ${order.invoiceStatus}` : order.channel }}</span>
               </div>
             </div>
           </article>
@@ -855,11 +1023,36 @@ function logout() {
       <template v-if="activeUserMenu === 'membership'">
         <section class="user-grid">
           <article class="module-card user-card">
-            <div class="module-header"><div><p class="eyebrow">月租服务</p><h3>套餐信息</h3></div><button class="link-button" @click="openMembership">查看详情</button></div>
+            <div class="module-header"><div><p class="eyebrow">月租服务</p><h3>套餐信息</h3></div><button class="link-button" @click="openMembership">刷新详情</button></div>
             <div class="user-meta-list interactive-card" @click="openMembership()">
               <div><span>套餐名称</span><strong>{{ dashboard.userPortal.membership.plan }}</strong></div>
               <div><span>到期日期</span><strong>{{ dashboard.userPortal.membership.expiresAt }}</strong></div>
               <div><span>绑定车位</span><strong>{{ dashboard.userPortal.membership.spaceCode }}</strong></div>
+            </div>
+            <div class="renewal-form-grid">
+              <label class="field">
+                <span class="field-icon">月</span>
+                <select v-model.number="renewalForm.months">
+                  <option :value="1">续费 1 个月</option>
+                  <option :value="3">续费 3 个月</option>
+                  <option :value="6">续费 6 个月</option>
+                  <option :value="12">续费 12 个月</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-icon">付</span>
+                <select v-model="renewalForm.paymentChannel">
+                  <option value="扫码支付">扫码支付</option>
+                  <option value="无感支付">无感支付</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-icon">券</span>
+                <input v-model="renewalForm.couponCode" type="text" placeholder="可选优惠券编码" />
+              </label>
+              <button class="primary-button" :disabled="userActionLoading.renewal" @click="handleRenewMembership">
+                {{ userActionLoading.renewal ? "续费中..." : "立即续费" }}
+              </button>
             </div>
           </article>
 
@@ -881,6 +1074,23 @@ function logout() {
                 <div v-for="item in userDetail.items" :key="item.label">
                   <span>{{ item.label }}</span>
                   <strong>{{ item.value }}</strong>
+                </div>
+              </div>
+              <div v-if="latestRenewal" class="renewal-history">
+                <h4>最近续费记录</h4>
+                <div class="user-meta-list">
+                  <div>
+                    <span>续费周期</span>
+                    <strong>{{ latestRenewal.months }} 个月</strong>
+                  </div>
+                  <div>
+                    <span>支付金额</span>
+                    <strong>¥ {{ latestRenewal.amount }}</strong>
+                  </div>
+                  <div>
+                    <span>新的到期日</span>
+                    <strong>{{ latestRenewal.expiresAt }}</strong>
+                  </div>
                 </div>
               </div>
             </div>
@@ -940,12 +1150,12 @@ function logout() {
         </div>
         <div class="content-grid single-top">
           <section class="module-card overview-hero">
-            <div class="module-header"><div><p class="eyebrow">The Command Center</p><h3>&#23454;&#26102;&#30417;&#25511;&#19982;&#36164;&#20135;&#27010;&#35272;</h3></div><div class="mini-badges"><span>{{ dashboard.gates[0]?.status || '&#22312;&#32447;' }}</span><span>12 &#20010;&#20998;&#21306;</span></div></div>
+            <div class="module-header"><div><p class="eyebrow">The Command Center</p><h3>实时监控与资产概览</h3></div><div class="mini-badges"><span>{{ dashboard.gates[0]?.status || '在线' }}</span><span>12 个分区</span></div></div>
             <div class="overview-grid">
               <article class="overview-panel trend-panel">
-                <p>&#36710;&#27969;&#36235;&#21183;</p>
+                <p>车流趋势</p>
                 <strong>1,284</strong>
-                <span>&#20170;&#26085;&#32047;&#35745;&#36827;&#22330;&#36710;&#36742;&#65292;&#36739;&#26152;&#26085;&#25552;&#21319; 12%</span>
+                <span>今日累计进场车辆，较昨日提升 12%</span>
                 <div class="mini-bars">
                   <span style="height: 38%"></span>
                   <span style="height: 56%"></span>
@@ -957,20 +1167,20 @@ function logout() {
                 </div>
               </article>
               <article class="overview-panel status-panel">
-                <p>&#35774;&#22791;&#22312;&#32447;&#29366;&#24577;</p>
+                <p>设备在线状态</p>
                 <div class="status-list">
-                  <div><strong>12/13</strong><span>&#38392;&#26426;&#22312;&#32447;</span></div>
-                  <div><strong>8/8</strong><span>&#25668;&#20687;&#22836;&#22312;&#32447;</span></div>
-                  <div><strong>99.2%</strong><span>&#35782;&#21035;&#25104;&#21151;&#29575;</span></div>
+                  <div><strong>12/13</strong><span>闸机在线</span></div>
+                  <div><strong>8/8</strong><span>摄像头在线</span></div>
+                  <div><strong>99.2%</strong><span>识别成功率</span></div>
                 </div>
               </article>
               <article class="overview-panel occupancy-panel">
-                <p>&#20998;&#21306;&#21344;&#29992;</p>
+                <p>分区占用</p>
                 <div class="zone-list">
-                  <div><span>A&#21306;</span><strong>82%</strong></div>
-                  <div><span>B&#21306;</span><strong>76%</strong></div>
-                  <div><span>C&#21306;</span><strong>68%</strong></div>
-                  <div><span>VIP&#21306;</span><strong>54%</strong></div>
+                  <div><span>A区</span><strong>82%</strong></div>
+                  <div><span>B区</span><strong>76%</strong></div>
+                  <div><span>C区</span><strong>68%</strong></div>
+                  <div><span>VIP区</span><strong>54%</strong></div>
                 </div>
               </article>
             </div>
@@ -1026,27 +1236,27 @@ function logout() {
 
       <template v-if="activeMenu === 'spaces'">
         <section class="module-card">
-          <div class="module-header"><div><p class="eyebrow">Space Optimization</p><h3>&#36710;&#20301;&#29366;&#24577;&#22320;&#22270;</h3></div><span class="status-pill">2D Live Map</span></div>
+          <div class="module-header"><div><p class="eyebrow">Space Optimization</p><h3>车位状态地图</h3></div><span class="status-pill">2D Live Map</span></div>
           <div class="parking-ops">
             <div class="parking-map">
-              <div class="map-toolbar"><button class="chip-button" @click="handleSpaceAction('release')">&#24674;&#22797;&#31354;&#38386;</button><button class="chip-button" @click="handleSpaceAction('reserve')">VIP &#39044;&#32422;</button><button class="chip-button" @click="handleSpaceAction('monthly')">&#36716;&#26376;&#31199;&#20301;</button></div>
+              <div class="map-toolbar"><button class="chip-button" @click="handleSpaceAction('release')">恢复空闲</button><button class="chip-button" @click="handleSpaceAction('reserve')">VIP 预约</button><button class="chip-button" @click="handleSpaceAction('monthly')">转月租位</button></div>
               <div class="space-grid">
                 <button v-for="space in dashboard.map" :key="space.code" class="space space-button" :class="[space.status, { active: selectedSpaceCode === space.code }]" @click="selectedSpaceCode = space.code">{{ space.code }}</button>
               </div>
             </div>
             <aside class="space-sidecard" v-if="selectedSpace">
-              <p class="eyebrow">&#21487;&#25805;&#20316;&#36710;&#20301;</p>
+              <p class="eyebrow">可操作车位</p>
               <h3>{{ selectedSpace.code }}</h3>
               <div class="space-meta">
-                <div><span>&#24403;&#21069;&#29366;&#24577;</span><strong>{{ selectedSpace.status }}</strong></div>
-                <div><span>&#36710;&#20301;&#31867;&#22411;</span><strong>{{ selectedSpace.type }}</strong></div>
-                <div><span>&#24403;&#21069;&#36523;&#20221;</span><strong>{{ roleLabel }}</strong></div>
+                <div><span>当前状态</span><strong>{{ getSpaceStatusLabel(selectedSpace.status) }}</strong></div>
+                <div><span>车位类型</span><strong>{{ getSpaceTypeLabel(selectedSpace.type) }}</strong></div>
+                <div><span>当前身份</span><strong>{{ roleLabel }}</strong></div>
               </div>
               <div class="space-actions">
-                <button class="primary-button" @click="handleSpaceAction('occupy')">&#26631;&#35760;&#21344;&#29992;</button>
-                <button class="secondary-button" @click="handleSpaceAction('release')">&#24674;&#22797;&#31354;&#38386;</button>
-                <button class="secondary-button" @click="handleSpaceAction('reserve')">&#35774;&#20026;&#39044;&#32422;</button>
-                <button class="secondary-button" @click="handleSpaceAction('temporary')">&#36716;&#20020;&#20572;&#36710;&#20301;</button>
+                <button class="primary-button" @click="handleSpaceAction('occupy')">标记占用</button>
+                <button class="secondary-button" @click="handleSpaceAction('release')">恢复空闲</button>
+                <button class="secondary-button" @click="handleSpaceAction('reserve')">设为预约</button>
+                <button class="secondary-button" @click="handleSpaceAction('temporary')">转临停车位</button>
               </div>
             </aside>
           </div>
