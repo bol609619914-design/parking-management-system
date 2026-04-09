@@ -10,7 +10,7 @@ async function main() {
 
   const seed = loadSeedDb();
   await writeDbToPrisma(seed);
-  console.log("Prisma seed completed");
+  console.log("MySQL 种子数据写入完成");
 }
 
 main()

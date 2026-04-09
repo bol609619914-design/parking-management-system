@@ -11,14 +11,13 @@ function buildAdapterConfig() {
   const url = new URL(process.env.DATABASE_URL);
   const allowPublicKeyRetrieval = url.searchParams.get("allowPublicKeyRetrieval");
   const ssl = url.searchParams.get("ssl");
+
   return {
     host: url.hostname,
     port: url.port ? Number(url.port) : 3306,
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, "") || undefined,
-    // MySQL 8 local installs often require public key retrieval when using
-    // the default caching_sha2_password authentication plugin.
     allowPublicKeyRetrieval: allowPublicKeyRetrieval ? allowPublicKeyRetrieval === "true" : true,
     ssl: ssl ? ssl !== "false" : false,
     ...(url.searchParams.get("connection_limit")
@@ -32,11 +31,22 @@ export function getPrismaClient() {
     const adapter = new PrismaMariaDb(buildAdapterConfig());
     globalForPrisma.__parkspherePrisma = new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+      log: process.env.NODE_ENV === "development" ? ["warn"] : [],
     });
   }
 
   return globalForPrisma.__parkspherePrisma;
+}
+
+export async function ensurePrismaReady() {
+  const config = buildAdapterConfig();
+  const prisma = getPrismaClient();
+  try {
+    await prisma.$connect();
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    throw new Error(`无法连接 MySQL 数据库：${config.host}:${config.port}/${config.database}`);
+  }
 }
 
 export async function disconnectPrisma() {

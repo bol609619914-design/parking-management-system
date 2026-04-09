@@ -9,6 +9,7 @@
     "dev:api:sqlite": "node scripts/start-sqlite.mjs",
     "build": "vite build --configLoader native",
     "build:portable": "node scripts/build-portable.mjs",
+    "build:mysql-idea": "node scripts/build-mysql-idea-package.mjs",
     "preview": "vite preview --configLoader native",
     "start": "node server/index.js",
     "start:sqlite": "node scripts/start-sqlite.mjs",

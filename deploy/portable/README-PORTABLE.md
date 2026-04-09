@@ -1,4 +1,4 @@
-# ParkSphere 单机交付包
+﻿# ParkSphere 单机交付包
 
 这个目录用于部署到一台没有预装 Node.js 和 MySQL 的 Windows 电脑。
 
